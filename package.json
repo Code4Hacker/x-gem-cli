@@ -8,16 +8,14 @@
   "files": [
     "bin/xgem",
     "lib",
-    "templates"
-  ],
-  "os": [
-    "darwin",
-    "linux"
+    "templates",
+    "scripts/check-platform.js"
   ],
   "engines": {
     "node": ">=14"
   },
   "scripts": {
+    "preinstall": "node scripts/check-platform.js",
     "test": "bash -n bin/xgem && for f in lib/*.sh; do bash -n \"$f\"; done"
   },
   "keywords": [

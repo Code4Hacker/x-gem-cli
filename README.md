@@ -16,11 +16,10 @@ and reconciles it automatically — see [Why the iOS build engine exists](#why-t
 ### Homebrew (macOS/Linux)
 
 ```sh
-brew tap Code4Hacker/xgem
-brew install xgem
+brew install Code4Hacker/xgem/xgem
 ```
 
-*(requires a separate `homebrew-xgem` tap repo and a tagged release — not set up yet)*
+xgem isn't in Homebrew's central `homebrew-core` (that requires a formal submission/review), so it lives in its own tap (`Code4Hacker/homebrew-xgem`). The `user/repo/formula` form above taps and installs in one step — no separate `brew tap` needed.
 
 ### npm
 
