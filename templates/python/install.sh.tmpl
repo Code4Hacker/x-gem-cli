@@ -1,0 +1,6 @@
+#!/bin/bash
+if [ -d ".venv" ]; then
+    source .venv/bin/activate && pip install -r requirements.txt
+else
+    echo -e "\033[31mError: Virtual environment (.venv) not found.\033[0m"
+fi

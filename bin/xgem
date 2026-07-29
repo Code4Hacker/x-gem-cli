@@ -1,324 +1,97 @@
 #!/bin/bash
+# xgem — framework-aware automation CLI. Entry point only: this dispatches
+# to lib/*.sh modules and holds no business logic of its own.
+
+_resolve_self_dir() {
+    local src="${BASH_SOURCE[0]}"
+    while [ -h "$src" ]; do
+        local dir
+        dir="$(cd -P "$(dirname "$src")" >/dev/null 2>&1 && pwd)"
+        src="$(readlink "$src")"
+        [[ $src != /* ]] && src="$dir/$src"
+    done
+    cd -P "$(dirname "$src")" >/dev/null 2>&1 && pwd
+}
+
+BIN_DIR="$(_resolve_self_dir)"
+XGEM_HOME="$(cd -P "$BIN_DIR/.." >/dev/null 2>&1 && pwd)"
+export XGEM_HOME
+
+# shellcheck source=lib/logger.sh
+source "$XGEM_HOME/lib/logger.sh"
+# shellcheck source=lib/utils.sh
+source "$XGEM_HOME/lib/utils.sh"
+# shellcheck source=lib/version.sh
+source "$XGEM_HOME/lib/version.sh"
+# shellcheck source=lib/doctor.sh
+source "$XGEM_HOME/lib/doctor.sh"
+# shellcheck source=lib/git.sh
+source "$XGEM_HOME/lib/git.sh"
+# shellcheck source=lib/ios.sh
+source "$XGEM_HOME/lib/ios.sh"
+# shellcheck source=lib/flutter.sh
+source "$XGEM_HOME/lib/flutter.sh"
+# shellcheck source=lib/scaffold.sh
+source "$XGEM_HOME/lib/scaffold.sh"
 
 CONFIG_DIR=".xgem-automate"
-ALL_FRAMEWORKS=("flutter" "node" "python" "react" "vue" "angular" "go" "rust" "docker" "swift")
 
-inject_templates() {
-    local framework=$1
-    mkdir -p "$CONFIG_DIR/$framework"
-    
-    case $framework in
-        flutter)
-            cat << 'EOF' > "$CONFIG_DIR/flutter/hard-clean.sh"
-#!/bin/bash
-echo "X-GEMINI -> Cleaning Flutter project..."
-rm -f pubspec.lock
-flutter clean
-
-if [ -d ios ]; then
-    echo "Removing iOS ephemeral files..."
-    rm -rf ios/Flutter/ephemeral
-    cd ios || exit
-
-    if [ -f Podfile ]; then
-        echo "CocoaPods detected – removing lock and Pods..."
-        rm -f Podfile.lock
-        rm -rf Pods
-    else
-        echo "Swift Package Manager detected – resolving packages..."
-        xcodebuild -resolvePackageDependencies -workspace Runner.xcworkspace -scheme Runner
-    fi
-    cd ..
-else
-    echo "No iOS target found, skipping iOS-specific cleanup."
-fi
-
-echo "⬇ Getting Flutter packages..."
-flutter pub get
-
-if [ -f ios/Podfile ]; then
-    echo "Installing iOS Pods..."
-    cd ios || exit
-    pod install
-    cd ..
-fi
-
-echo "Running Flutter..."
-flutter run -v
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/flutter/build.sh"
-#!/bin/bash
-echo -e "\033[1;34m--- Flutter Build Orchestrator ---\033[0m"
-
-CURRENT_NAME=""
-CURRENT_NUM=""
-if [ -f "pubspec.yaml" ]; then
-    CURRENT_FULL=$(grep '^version:' pubspec.yaml | head -n 1 | awk '{print $2}')
-    if [ -n "$CURRENT_FULL" ]; then
-        CURRENT_NAME=$(echo "$CURRENT_FULL" | cut -d'+' -f1)
-        CURRENT_NUM=$(echo "$CURRENT_FULL" | cut -d'+' -f2)
-        if [ "$CURRENT_NAME" == "$CURRENT_NUM" ]; then
-            CURRENT_NUM="1"
-        fi
-        echo -e "Current pubspec.yaml version: \033[1;33m$CURRENT_FULL\033[0m\n"
-    fi
-fi
-
-read -p "Enter build version name [${CURRENT_NAME:-1.0.0}]: " BUILD_NAME
-BUILD_NAME=${BUILD_NAME:-${CURRENT_NAME:-1.0.0}}
-
-read -p "Enter build number [${CURRENT_NUM:-1}]: " BUILD_NUMBER
-BUILD_NUMBER=${BUILD_NUMBER:-${CURRENT_NUM:-1}}
-
-read -p "Is this a release build? (Y/n) [default: y]: " IS_RELEASE
-IS_RELEASE=${IS_RELEASE:-y}
-
-if [ -f "pubspec.yaml" ]; then
-    NEW_VERSION="${BUILD_NAME}+${BUILD_NUMBER}"
-    echo -e "\033[1;32mUpdating pubspec.yaml to version: $NEW_VERSION...\033[0m"
-    sed -e "s/^version:.*/version: $NEW_VERSION/" pubspec.yaml > pubspec.tmp && mv pubspec.tmp pubspec.yaml
-fi
-
-echo -e "\nSelect Target Platform:"
-echo "1) APK (Android)"
-echo "2) iOS"
-echo "3) macOS"
-echo "4) Windows"
-echo "5) Linux"
-read -p "Choose [1-5]: " PLATFORM_CHOICE
-
-if ! [[ "$PLATFORM_CHOICE" =~ ^[1-5]$ ]]; then
-    echo -e "\033[31mError: Invalid platform choice '$PLATFORM_CHOICE'.\033[0m"
-    exit 1
-fi
-
-MODE="--release"
-if [[ "$IS_RELEASE" == "n" || "$IS_RELEASE" == "N" ]]; then
-    MODE="--debug"
-fi
-
-BUILD_ARGS="--build-name=$BUILD_NAME --build-number=$BUILD_NUMBER"
-
-if [ "$PLATFORM_CHOICE" -eq 2 ]; then
-    echo -e "\n\033[1;33mPreparing iOS build environment...\033[0m"
-    echo -e "\033[1;33mRemoving stale ephemeral package...\033[0m"
-    rm -rf ios/Flutter/ephemeral
-
-    PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
-    echo -e "\033[1;33mPatching deployment target to 15.0...\033[0m"
-    sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]\+;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' "$PBXPROJ"
-    echo -e "\033[32mDeployment target updated.\033[0m"
-
-    echo -e "\033[1;33mRegenerating dependencies...\033[0m"
-    flutter pub get
-
-    if [ -f ios/Podfile ]; then
-        echo -e "\033[1;33mCocoaPods detected – installing pods...\033[0m"
-        cd ios && pod install && cd ..
-    else
-        echo -e "\033[1;33mSwift Package Manager detected – resolving packages...\033[0m"
-        xcodebuild -resolvePackageDependencies -workspace ios/Runner.xcworkspace -scheme Runner
-    fi
-
-    echo -e "\n\033[1;34mInitializing Flutter iOS Build ($MODE)...\033[0m"
-    echo -n "Building iOS app... "
-    flutter build ios $MODE $BUILD_ARGS > /tmp/flutter_ios_build.log 2>&1
-    BUILD_EXIT=$?
-    if [ $BUILD_EXIT -ne 0 ]; then
-        echo -e "\033[31mFAILED\033[0m"
-        cat /tmp/flutter_ios_build.log
-        exit $BUILD_EXIT
-    fi
-    echo -e "\033[32mDone\033[0m"
-
-    echo -e "\n\033[1;34mArchiving for Xcode Organizer...\033[0m"
-    ARCHIVE_DATE=$(date +%Y-%m-%d)
-    ARCHIVE_TIME=$(date +%H.%M.%S)
-    ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives/$ARCHIVE_DATE"
-    mkdir -p "$ARCHIVE_DIR"
-    ARCHIVE_PATH="$ARCHIVE_DIR/Runner $ARCHIVE_TIME.xcarchive"
-
-    echo -n "Creating archive... "
-    xcodebuild -workspace ios/Runner.xcworkspace \
-               -scheme Runner \
-               -sdk iphoneos \
-               -configuration Release \
-               archive \
-               -archivePath "$ARCHIVE_PATH" \
-               BUILD_NUMBER=$BUILD_NUMBER \
-               MARKETING_VERSION=$BUILD_NAME \
-               -allowProvisioningUpdates \
-               > /tmp/xcode_archive.log 2>&1
-    ARCHIVE_EXIT=$?
-    if [ $ARCHIVE_EXIT -ne 0 ]; then
-        echo -e "\033[31mFAILED\033[0m"
-        cat /tmp/xcode_archive.log
-        exit $ARCHIVE_EXIT
-    fi
-    echo -e "\033[32mDone\033[0m"
-    echo -e "Archive created at: $ARCHIVE_PATH"
-
-    echo -e "\n\033[1;32mOpening Xcode Organizer & Workspace...\033[0m"
-    osascript -e '
-        tell application "Xcode" to activate
-        delay 1
-        tell application "System Events" to tell process "Xcode"
-            click menu item "Organizer" of menu "Window" of menu bar 1
-        end tell
-    '
-    open ios/Runner.xcworkspace
-else
-    echo -e "\n\033[1;34mInitializing Flutter Build ($MODE) for version $BUILD_NAME+$BUILD_NUMBER...\033[0m"
-    case $PLATFORM_CHOICE in
-        1) flutter build apk $MODE $BUILD_ARGS ;;
-        3) flutter build macos $MODE $BUILD_ARGS ;;
-        4) flutter build windows $MODE $BUILD_ARGS ;;
-        5) flutter build linux $MODE $BUILD_ARGS ;;
-        *) echo -e "\033[31mInvalid platform choice.\033[0m"; exit 1 ;;
+# ---- Global flags: --yes, --dry-run, --verbose — recognized anywhere in
+# the argument list and stripped before dispatch. ----
+ARGS=()
+for arg in "$@"; do
+    case "$arg" in
+        --yes)     XGEM_YES=1 ;;
+        --dry-run) XGEM_DRY_RUN=1 ;;
+        --verbose) XGEM_VERBOSE=1 ;;
+        *) ARGS+=("$arg") ;;
     esac
-fi
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/flutter/build-runner.sh"
-#!/bin/bash
-echo -e "\033[1;34mRunning Flutter Build Runner...\033[0m"
-read -p "Run in verbose mode? (Y/n): " VERBOSE_CHOICE
-VERBOSE_CHOICE=${VERBOSE_CHOICE:-Y}
+done
+set -- "${ARGS[@]}"
 
-CMD="flutter pub run build_runner build --delete-conflicting-outputs"
-if [[ "$VERBOSE_CHOICE" == "Y" || "$VERBOSE_CHOICE" == "y" ]]; then
-    CMD="$CMD -v"
-fi
-
-echo -e "Executing: \033[33m$CMD\033[0m"
-eval $CMD
-EOF
-            ;;
-        node)
-            cat << 'EOF' > "$CONFIG_DIR/node/hard-clean.sh"
-#!/bin/bash
-echo -e "\033[1;33mNuking node_modules and resetting package locks...\033[0m"
-rm -rf node_modules package-lock.json yarn.lock && npm install
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/node/build.sh"
-#!/bin/bash
-echo -e "\033[1;34mBuilding Node project...\033[0m"
-npm run build
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/node/start.sh"
-#!/bin/bash
-npm run start
-EOF
-            ;;
-        python)
-            cat << 'EOF' > "$CONFIG_DIR/python/hard-clean.sh"
-#!/bin/bash
-echo -e "\033[1;33mCleaning Python cache and rebuilding environment...\033[0m"
-rm -rf __pycache__ .venv *.pyc
-python3 -m venv .venv
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/python/install.sh"
-#!/bin/bash
-if [ -d ".venv" ]; then
-    source .venv/bin/activate && pip install -r requirements.txt
-else
-    echo -e "\033[31mError: Virtual environment (.venv) not found.\033[0m"
-fi
-EOF
-            ;;
-        react|vue|angular)
-            cat << EOF > "$CONFIG_DIR/$framework/hard-clean.sh"
-#!/bin/bash
-echo -e "\033[1;33mResetting $framework dependencies...\033[0m"
-rm -rf node_modules package-lock.json yarn.lock && npm install
-EOF
-            cat << EOF > "$CONFIG_DIR/$framework/build.sh"
-#!/bin/bash
-npm run build
-EOF
-            cat << EOF > "$CONFIG_DIR/$framework/dev.sh"
-#!/bin/bash
-npm run dev
-EOF
-            ;;
-        go)
-            cat << 'EOF' > "$CONFIG_DIR/go/hard-clean.sh"
-#!/bin/bash
-echo -e "\033[1;33mCleaning Go module cache...\033[0m"
-go clean -modcache
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/go/build.sh"
-#!/bin/bash
-go build -o bin/main main.go
-EOF
-            ;;
-        rust)
-            cat << 'EOF' > "$CONFIG_DIR/rust/hard-clean.sh"
-#!/bin/bash
-cargo clean
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/rust/build.sh"
-#!/bin/bash
-cargo build --release
-EOF
-            ;;
-        docker)
-            cat << 'EOF' > "$CONFIG_DIR/docker/hard-clean.sh"
-#!/bin/bash
-echo -e "\033[1;33mPruning unused Docker assets and volumes...\033[0m"
-docker system prune -a --volumes -f
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/docker/build-up.sh"
-#!/bin/bash
-docker-compose up --build -d
-EOF
-            ;;
-        swift)
-            cat << 'EOF' > "$CONFIG_DIR/swift/hard-clean.sh"
-#!/bin/bash
-rm -rf .build && swift package clean
-EOF
-            cat << 'EOF' > "$CONFIG_DIR/swift/build.sh"
-#!/bin/bash
-swift build -c release
-EOF
-            ;;
-    esac
-    chmod +x "$CONFIG_DIR/$framework/"*.sh 2>/dev/null
+print_banner() {
+    echo -e "\033[38;5;208m"
+    echo -e "██╗  ██╗       ██████╗ ███████╗███╗   ███╗██╗███╗   ██╗██╗"
+    echo -e "╚██╗██╔╝      ██╔════╝ ██╔════╝████╗ ████║██║████╗  ██║██║"
+    echo -e " ╚███╔╝ █████╗██║  ███╗█████╗  ██╔████╔██║██║██╔██╗ ██║██║"
+    echo -e " ██╔██╗ ╚════╝██║   ██║██╔══╝  ██║╚██╔╝██║██║██║╚██╗██║██║"
+    echo -e "██╔╝ ██╗      ╚██████╔╝███████╗██║ ╚═╝ ██║██║██║ ╚████║██║"
+    echo -e "╚═╝  ╚═╝       ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝\033[0m"
+    echo -e "\033[1;36m           ....Authored by Paulo Michael....\033[0m\n"
 }
 
-get_remaining_frameworks() {
-    REMAINING_FWS=()
-    for fw in "${ALL_FRAMEWORKS[@]}"; do
-        if [ ! -d "$CONFIG_DIR/$fw" ]; then
-            REMAINING_FWS+=("$fw")
-        fi
-    done
+print_usage() {
+    echo "Usage:"
+    echo "  xgem init                     - Initialize tracking system and add first framework"
+    echo "  xgem add                      - Interactive state-aware addition of remaining frameworks"
+    echo "  xgem run <framework> <script> - Run a workspace automation command script"
+    echo "  xgem terminate                - Purge all generated automated layouts completely"
+    echo "  xgem <framework> [help]       - View tailored instructions for a specific script layout"
+    echo "  xgem doctor [ios]             - Report on your environment / iOS SwiftPM build readiness"
+    echo "  xgem git cmt \"message\"        - Auto-stage, commit, rebase-pull, and push"
+    echo "  xgem git init                 - Setup local repo, attach remote tracker shortcuts"
+    echo "  xgem git rm-remote            - Drop specified target remote tracing rules"
+    echo "  xgem git rm-branch            - Safely drop local and remote workspace branch states"
+    echo "  xgem --version                - Print xgem's version"
+    echo ""
+    echo "Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose"
 }
 
-case "$1" in
+case "${1:-}" in
     init)
-        echo -e "\033[38;5;208m"
-        echo -e "██╗  ██╗       ██████╗ ███████╗███╗   ███╗██╗███╗   ██╗██╗"
-        echo -e "╚██╗██╔╝      ██╔════╝ ██╔════╝████╗ ████║██║████╗  ██║██║"
-        echo -e " ╚███╔╝ █████╗██║  ███╗█████╗  ██╔████╔██║██║██╔██╗ ██║██║"
-        echo -e " ██╔██╗ ╚════╝██║   ██║██╔══╝  ██║╚██╔╝██║██║██║╚██╗██║██║"
-        echo -e "██╔╝ ██╗      ╚██████╔╝███████╗██║ ╚═╝ ██║██║██║ ╚████║██║"
-        echo -e "╚═╝  ╚═╝       ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝\033[0m"
-        echo -e "\033[1;36m           ....Authored by Paulo Michael....\033[0m\n"
-
+        print_banner
         if [ -d "$CONFIG_DIR" ]; then
-            echo -e "\033[33mWorkspace configuration layer already exists! Use 'xgem add' to append frameworks.\033[0m"
+            log_warn "Workspace configuration layer already exists! Use 'xgem add' to append frameworks."
             exit 0
         fi
-
         mkdir -p "$CONFIG_DIR"
-        
+
         echo -e "\033[1;34mSelect your starting framework architecture:\033[0m"
         PS3="Enter target selection number: "
         select fw in "${ALL_FRAMEWORKS[@]}"; do
             if [ -n "$fw" ]; then
-                inject_templates "$fw"
-                echo -e "\033[32mSuccessfully appended standard scripts for: $CONFIG_DIR/$fw\033[0m"
+                scaffold_inject_templates "$fw" "$CONFIG_DIR"
+                log_success "Successfully appended standard scripts for: $CONFIG_DIR/$fw"
                 break
             else
                 echo "Invalid selection."
@@ -328,31 +101,28 @@ case "$1" in
         if [ -f .gitignore ]; then
             if ! grep -q "$CONFIG_DIR/" .gitignore; then
                 echo -e "\n$CONFIG_DIR/" >> .gitignore
-                echo -e "\033[32mAdded automation tracking to .gitignore\033[0m"
+                log_success "Added automation tracking to .gitignore"
             fi
         else
             echo "$CONFIG_DIR/" > .gitignore
-            echo -e "\033[32mCreated .gitignore and hidden tracking layer folder references.\033[0m"
+            log_success "Created .gitignore and hidden tracking layer folder references."
         fi
         exit 0
         ;;
 
     add)
-        if [ ! -d "$CONFIG_DIR" ]; then
-            echo -e "\033[31mError: System tracking layer not found. Run 'xgem init' first.\033[0m"
-            exit 1
-        fi
+        [ -d "$CONFIG_DIR" ] || die "System tracking layer not found. Run 'xgem init' first."
 
-        get_remaining_frameworks
+        scaffold_get_remaining_frameworks "$CONFIG_DIR"
 
         if [ ${#REMAINING_FWS[@]} -eq 0 ]; then
-            echo -e "\033[33mAll available framework blocks are already generated inside the workspace!\033[0m"
-            read -p "Do you want to restore/regenerate all framework templates to defaults? (y/n): " RESTORE_CHOICE
-            if [[ "$RESTORE_CHOICE" == "y" || "$RESTORE_CHOICE" == "Y" ]]; then
+            log_warn "All available framework blocks are already generated inside the workspace!"
+            read -r -p "Do you want to restore/regenerate all framework templates to defaults? (y/n): " restore_choice
+            if [[ "$restore_choice" == "y" || "$restore_choice" == "Y" ]]; then
                 for fw in "${ALL_FRAMEWORKS[@]}"; do
-                    inject_templates "$fw"
+                    scaffold_inject_templates "$fw" "$CONFIG_DIR"
                 done
-                echo -e "\033[32mAll framework automation layouts cleanly re-generated!\033[0m"
+                log_success "All framework automation layouts cleanly re-generated!"
             fi
             exit 0
         fi
@@ -364,302 +134,97 @@ case "$1" in
                 echo "Operation canceled."
                 exit 0
             elif [ -n "$choice" ]; then
-                inject_templates "$choice"
-                echo -e "\033[32mSuccessfully loaded and updated files for: $CONFIG_DIR/$choice\033[0m"
+                scaffold_inject_templates "$choice" "$CONFIG_DIR"
+                log_success "Successfully loaded and updated files for: $CONFIG_DIR/$choice"
                 break
             else
-                echo -e "\033[31mInvalid option.\033[0m"
+                echo "Invalid option."
             fi
         done
         exit 0
         ;;
 
     run)
-        FRAMEWORK=$2
-        SCRIPT_NAME=$3
-        TARGET_SCRIPT="$CONFIG_DIR/$FRAMEWORK/$SCRIPT_NAME.sh"
-        
-        if [ -f "$TARGET_SCRIPT" ]; then
-            echo -e "\033[1;34mRunning script '$SCRIPT_NAME' for $FRAMEWORK...\033[0m\n"
-            bash "$TARGET_SCRIPT"
+        FRAMEWORK=${2:-}
+        SCRIPT_NAME=${3:-}
+        [ -n "$FRAMEWORK" ] && [ -n "$SCRIPT_NAME" ] || die "Usage: xgem run <framework> <script>"
+
+        if [ "$FRAMEWORK" = "flutter" ] && flutter_native_command_exists "$SCRIPT_NAME"; then
+            flutter_run_native_command "$SCRIPT_NAME"
         else
-            echo -e "\033[31mError: Script not found at $TARGET_SCRIPT\033[0m"
-            if [ -d "$CONFIG_DIR/$FRAMEWORK" ]; then
-                echo -e "Available scripts in '$FRAMEWORK':"
-                ls "$CONFIG_DIR/$FRAMEWORK" | sed 's/\.sh$//' | sed 's/^/  - /'
-            fi
-            exit 1
+            scaffold_run_script "$FRAMEWORK" "$SCRIPT_NAME" "$CONFIG_DIR"
         fi
         exit 0
         ;;
 
     terminate)
-        if [ ! -d "$CONFIG_DIR" ]; then
-            echo -e "\033[31mError: Tracking layer $CONFIG_DIR not found. Nothing to terminate.\033[0m"
-            exit 1
-        fi
+        [ -d "$CONFIG_DIR" ] || die "Tracking layer $CONFIG_DIR not found. Nothing to terminate."
 
-        echo -e "\033[1;31mInitiating core termination sequence for $CONFIG_DIR...\033[0m"
-        
+        log_warn "Initiating core termination sequence for $CONFIG_DIR..."
         FOLDERS=($(find "$CONFIG_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;))
         COUNT=${#FOLDERS[@]}
 
-        for i in {1..3}; do
-            echo -ne "\033[1;33mPurging local environments\033[0m"
-            for j in {1..3}; do
-                echo -ne "."
-                sleep 0.2
-            done
-            echo -ne "\r\033[K"
-        done
+        confirm "This deletes $CONFIG_DIR and everything in it. Continue?" || { log_info "Cancelled."; exit 0; }
 
-        echo -e "\033[1;31mDeleting framework configuration blocks:\033[0m"
         for fw in "${FOLDERS[@]}"; do
             echo -e "  \033[31m[ x ]\033[0m Removing $fw..."
-            rm -rf "$CONFIG_DIR/$fw"
-            sleep 0.3
+            rm -rf "${CONFIG_DIR:?}/$fw"
         done
-
         rm -rf "$CONFIG_DIR"
 
         if [ -f .gitignore ]; then
             grep -v "^$CONFIG_DIR/" .gitignore > tmp_gitignore && mv tmp_gitignore .gitignore
-            echo -e "\033[32mCleaned up .gitignore tracking records.\033[0m"
+            log_success "Cleaned up .gitignore tracking records."
         fi
 
-        echo -e "\n\033[1;32mTermination complete.\033[0m"
-        echo -e "\033[1;36mTotal blocks destroyed: $COUNT\033[0m (${FOLDERS[*]})"
+        log_success "Termination complete. Total blocks destroyed: $COUNT (${FOLDERS[*]:-none})"
         exit 0
         ;;
 
     git)
-        if [ "$2" == "cmt" ]; then
-            COMMIT_MSG="$3"
-            if [ -z "$COMMIT_MSG" ]; then
-                echo -e "\033[31mError: Missing commit message!\033[0m"
-                exit 1
-            fi
+        [ -n "${2:-}" ] || die "Usage: xgem git <cmt|init|rm-remote|rm-branch>"
+        cmd_git "$2" "${3:-}"
+        exit 0
+        ;;
 
-            echo -e "\033[1;34mChecking repository status...\033[0m"
-            git status -s
-            echo ""
-            
-            read -p "Do you want to add ALL files (a) or INDIVIDUAL files (i)? [a/i]: " ADD_CHOICE
-            if [[ "$ADD_CHOICE" == "a" || "$ADD_CHOICE" == "A" ]]; then
-                git add .
-                echo -e "\033[32mAll files staged.\033[0m"
-            elif [[ "$ADD_CHOICE" == "i" || "$ADD_CHOICE" == "I" ]]; then
-                read -p "Enter specific file paths to add (space separated): " -a SPECIFIC_FILES
-                git add "${SPECIFIC_FILES[@]}"
-                echo -e "\033[32mSelected files staged.\033[0m"
-            else
-                echo -e "\033[31mError: Invalid choice. Operation aborted.\033[0m"
-                exit 1
-            fi
+    doctor)
+        cmd_doctor "${2:-}" "${3:-.}"
+        exit 0
+        ;;
 
-            echo -e "\033[1;34mCommitting changes...\033[0m"
-            git commit -m "$COMMIT_MSG"
-            COMMIT_STATUS=$?
-            if [ $COMMIT_STATUS -ne 0 ]; then
-                echo -e "\033[31mError: Commit failed. Aborting before pull/push.\033[0m"
-                exit 1
-            fi
-
-            CURRENT_BRANCH=$(git branch --show-current 2>/dev/null)
-            if git remote | grep -q "^origin$"; then
-                REMOTE_NAME="origin"
-            else
-                REMOTE_NAME=$(git remote | head -n 1)
-            fi
-
-            if git remote | grep -q "^$REMOTE_NAME$"; then
-                echo -e "\033[1;34mPulling updates from remote '$REMOTE_NAME' on '$CURRENT_BRANCH' via rebase...\033[0m"
-                git pull --rebase "$REMOTE_NAME" "$CURRENT_BRANCH"
-                PULL_STATUS=$?
-
-                if [ $PULL_STATUS -ne 0 ]; then
-                    echo -e "\n\033[31mError: MERGE CONFLICT DETECTED!\033[0m"
-                    echo -e "\033[33mWarning: Execution paused. Resolve conflicts to proceed.\033[0m\n"
-                    read -p "Do you want to open VS Code to resolve this now? (y/n): " OPEN_EDITOR
-                    if [[ "$OPEN_EDITOR" == "y" || "$OPEN_EDITOR" == "Y" ]]; then code .; fi
-                    exit 1
-                else
-                    echo -e "\033[32mClean sync pull achieved. Pushing to upstream target...\033[0m"
-                    git push "$REMOTE_NAME" "$CURRENT_BRANCH"
-                    if [ $? -eq 0 ]; then
-                        echo -e "\033[32mGit workflow complete! Code cleanly committed and synchronized.\033[0m"
-                    else
-                        echo -e "\033[31mError: Push operation execution failed on server connection.\033[0m"
-                        exit 1
-                    fi
-                fi
-            else
-                echo -e "\033[33mWarning: Local commit dropped cleanly, but tracking remote sync was skipped.\033[0m"
-            fi
-            exit 0
-
-        elif [ "$2" == "init" ]; then
-            echo -e "\033[1;34mInitializing local Git repository...\033[0m"
-            git init
-
-            REMOTE_NAME="origin"
-            read -p "Enter remote repository URL: " REMOTE_URL
-            if [ -n "$REMOTE_URL" ]; then
-                read -p "Enter remote name (default: origin): " USER_REMOTE_NAME
-                if [ -n "$USER_REMOTE_NAME" ]; then
-                    REMOTE_NAME="$USER_REMOTE_NAME"
-                fi
-
-                if git remote | grep -q "^$REMOTE_NAME$"; then
-                    git remote set-url "$REMOTE_NAME" "$REMOTE_URL"
-                    echo -e "\033[32mRemote '$REMOTE_NAME' already existed. URL updated.\033[0m"
-                else
-                    git remote add "$REMOTE_NAME" "$REMOTE_URL"
-                    echo -e "\033[32mRemote '$REMOTE_NAME' successfully added.\033[0m"
-                fi
-            fi
-
-            read -p "Enter branch name (default: main): " BRANCH_NAME
-            if [ -z "$BRANCH_NAME" ]; then BRANCH_NAME="main"; fi
-            git branch -M "$BRANCH_NAME"
-            
-            git add .
-            git commit -m "initial changes" 2>/dev/null
-            echo -e "\033[32mLocal baseline configuration setup completed.\033[0m"
-            exit 0
-
-        elif [ "$2" == "rm-remote" ]; then
-            echo -e "\033[1;34mCurrent configured remotes:\033[0m"
-            git remote -v
-            echo ""
-            
-            read -p "Enter the short remote name to remove (e.g. origin): " REMOTE_NAME
-            if [ -z "$REMOTE_NAME" ]; then
-                REMOTE_NAME="origin"
-            fi
-            
-            if git remote | grep -q "^$REMOTE_NAME$"; then
-                git remote remove "$REMOTE_NAME"
-                echo -e "\033[32mSuccessfully removed remote reference configuration: $REMOTE_NAME\033[0m"
-            else
-                echo -e "\033[31mError: Remote tracking short-name '$REMOTE_NAME' does not exist.\033[0m"
-                exit 1
-            fi
-            exit 0
-
-        elif [ "$2" == "rm-branch" ]; then
-            read -p "Enter the name of the branch you want to target: " TARGET_BRANCH
-            if [ -z "$TARGET_BRANCH" ]; then
-                echo -e "\033[31mError: Branch name cannot be empty.\033[0m"
-                exit 1
-            fi
-
-            read -p "Where do you want to delete this branch? (l = local only, r = remote only, b = both) [l/r/b]: " WHERE_CHOICE
-            echo ""
-
-            if [[ "$WHERE_CHOICE" == "l" || "$WHERE_CHOICE" == "b" || "$WHERE_CHOICE" == "L" || "$WHERE_CHOICE" == "B" ]]; then
-                CURRENT_BRANCH=$(git branch --show-current 2>/dev/null)
-                if [ "$CURRENT_BRANCH" == "$TARGET_BRANCH" ]; then
-                    echo -e "\033[33mYou are currently sitting on '$TARGET_BRANCH'. Switching to safe branch...\033[0m"
-                    git checkout main || git checkout master || git checkout dev 2>/dev/null
-                fi
-
-                echo -e "\033[1;34mForce deleting local branch '$TARGET_BRANCH'...\033[0m"
-                git branch -D "$TARGET_BRANCH"
-                if [ $? -eq 0 ]; then
-                    echo -e "\033[32mSuccessfully deleted local copy of branch.\033[0m\n"
-                else
-                    echo -e "\033[31mWarning: Local branch could not be dropped (it may already be gone).\033[0m\n"
-                fi
-            fi
-
-            if [[ "$WHERE_CHOICE" == "r" || "$WHERE_CHOICE" == "b" || "$WHERE_CHOICE" == "R" || "$WHERE_CHOICE" == "B" ]]; then
-                read -p "Enter remote identifier (short-name like 'origin'): " REMOTE_TARGET
-                if [ -z "$REMOTE_TARGET" ]; then
-                    REMOTE_TARGET="origin"
-                fi
-
-                echo -e "\033[1;34mSending deletion request for remote branch '$TARGET_BRANCH' to server...\033[0m"
-                git push "$REMOTE_TARGET" --delete "$TARGET_BRANCH"
-                if [ $? -eq 0 ]; then
-                    echo -e "\033[32mSuccessfully wiped out remote branch '$TARGET_BRANCH' from server.\033[0m"
-                else
-                    echo -e "\033[31mError: Server rejected the branch drop execution request.\033[0m"
-                    exit 1
-                fi
-            fi
-            exit 0
-        fi
+    --version|-V|version)
+        print_version
+        exit 0
         ;;
 
     flutter|node|python|react|vue|angular|go|rust|docker|swift)
         TARGET_FW=$1
         TARGET_FW_UPPER=$(echo "$TARGET_FW" | tr '[:lower:]' '[:upper:]')
-        
+
         echo -e "\033[1;36m=== $TARGET_FW_UPPER Automation Blueprint ===\033[0m"
-        
         if [ ! -d "$CONFIG_DIR/$TARGET_FW" ]; then
-            echo -e "\033[33mStatus: Not currently injected in this workspace.\033[0m"
+            log_warn "Status: Not currently injected in this workspace."
             echo -e "Run \033[1;32mxgem add\033[0m to instantly append its structural scripts.\n"
         else
-            echo -e "\033[32mStatus: Active & Mounted inside $CONFIG_DIR/$TARGET_FW/\033[0m\n"
+            log_success "Status: Active & Mounted inside $CONFIG_DIR/$TARGET_FW/"
+            echo ""
         fi
-        
-        echo -e "To execute scripts, use: \033[1;34mxgem run $TARGET_FW <script>\033[0m\n"
-        echo -e "Configured Commands:"
 
-        case $TARGET_FW in
-            flutter)
-                echo -e "  \033[1;32mhard-clean\033[0m   - Wipes lockfiles, clears ephemeral targets, resolves packages, runs verbosely."
-                echo -e "  \033[1;32mbuild\033[0m        - Interactive multi-platform build orchestrator (updates pubspec.yaml, performs deep iOS cleanup, builds & opens Xcode Organizer/Workspace)."
-                echo -e "  \033[1;32mbuild-runner\033[0m - Overwrites outdated assets, driving clean model code generation (supports verbose)."
-                ;;
-            node)
-                echo -e "  \033[1;32mhard-clean\033[0m   - Wipes node_modules & lockfiles, spinning up a pristine npm installation."
-                echo -e "  \033[1;32mbuild\033[0m        - Compiles production-optimized code bundles."
-                echo -e "  \033[1;32mstart\033[0m        - Fires up local production engine cluster deployments."
-                ;;
-            python)
-                echo -e "  \033[1;32mhard-clean\033[0m   - Flushes compiled caches and reconstructs the active local .venv."
-                echo -e "  \033[1;32minstall\033[0m      - Automatically handles virtual environment activation and handles dependencies."
-                ;;
-            react|vue|angular)
-                echo -e "  \033[1;32mhard-clean\033[0m   - Clears development caches, rebuilding lock structures cleanly."
-                echo -e "  \033[1;32mbuild\033[0m        - Assembles asset compilation pipelines for fast production deployments."
-                echo -e "  \033[1;32mdev\033[0m          - Mounts an interactive workspace developer web-server workspace environment."
-                ;;
-            go)
-                echo -e "  \033[1;32mhard-clean\033[0m   - Purges localized caches and module layout layers."
-                echo -e "  \033[1;32mbuild\033[0m        - Drops streamlined executable binaries into localized bin targets."
-                ;;
-            rust)
-                echo -e "  \033[1;32mhard-clean\033[0m   - Drops targeted artifact footprints via strict cargo wipe routines."
-                echo -e "  \033[1;32mbuild\033[0m        - Bundles highly optimized binaries using deep release profile passes."
-                ;;
-            docker)
-                echo -e "  \033[1;32mhard-clean\033[0m   - Mass prunes background dangling system environments, storage layers, and caching blocks."
-                echo -e "  \033[1;32mbuild-up\033[0m     - Recalculates configuration architectures and stands services up detached."
-                ;;
-            swift)
-                echo -e "  \033[1;32mhard-clean\033[0m   - Completely flushes SPM structural footprints and local environments."
-                echo -e "  \033[1;32mbuild\033[0m        - Packs application runtimes into native release targets."
-                ;;
-        esac
+        echo -e "To execute scripts, use: \033[1;34mxgem run $TARGET_FW <script>\033[0m\n"
+        echo "Configured Commands:"
+        for script in $(framework_scripts "$TARGET_FW"); do
+            echo -e "  \033[1;32m$script\033[0m"
+        done
+        if [ "$TARGET_FW" = "flutter" ]; then
+            echo ""
+            log_info "Flutter builds now use xgem's SwiftPM-aware iOS engine automatically. Run 'xgem doctor ios' for a build-readiness report."
+        fi
         echo ""
         exit 0
         ;;
 
     *)
-        echo "Usage:"
-        echo "  xgem init                     - Initialize tracking system and add first framework"
-        echo "  xgem add                      - Interactive state-aware addition of remaining frameworks"
-        echo "  xgem run <framework> <script> - Run a workspace automation command script"
-        echo "  xgem terminate                - Purge all generated automated layouts completely with visual feedback"
-        echo "  xgem <framework> [help]       - View tailored instructions for a specific script layout"
-        echo "  xgem git cmt \"message\"        - Auto-stage, commit, rebase-pull, and force verification push"
-        echo "  xgem git init                 - Setup local repo, attach remote tracker shortcuts"
-        echo "  xgem git rm-remote            - Drop specified target remote tracing rules gracefully"
-        echo "  xgem git rm-branch            - Safely drop local and remote workspace branch states"
+        print_usage
         exit 0
         ;;
 esac

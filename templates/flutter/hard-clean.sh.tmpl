@@ -1,0 +1,5 @@
+#!/bin/bash
+# This file just delegates to xgem's native flutter engine (lib/flutter.sh)
+# so there's a single source of truth instead of two copies that can drift.
+# It exists on disk for documentation/manual-run parity with other frameworks.
+exec xgem run flutter hard-clean

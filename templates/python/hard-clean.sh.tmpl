@@ -1,0 +1,4 @@
+#!/bin/bash
+echo -e "\033[1;33mCleaning Python cache and rebuilding environment...\033[0m"
+rm -rf __pycache__ .venv *.pyc
+python3 -m venv .venv
