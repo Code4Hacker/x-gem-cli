@@ -1,6 +1,6 @@
 {
   "name": "xgem-cli",
-  "version": "2.0.0-alpha",
+  "version": "2.0.0-alpha.1",
   "description": "Framework-aware automation CLI: scaffolds and runs clean/build/dev scripts per project type, an environment doctor, a SwiftPM-aware iOS build engine, and a git workflow helper.",
   "bin": {
     "xgem": "bin/xgem"
