@@ -1,9 +1,9 @@
 #!/bin/bash
 # xgem installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/Code4Hacker/x-gem-cli/xgem/install.sh | bash
 set -euo pipefail
 
-REPO_URL="https://github.com/<owner>/<repo>.git"
+REPO_URL="https://github.com/Code4Hacker/x-gem-cli.git"
 SHARE_DIR="${XGEM_SHARE_DIR:-$HOME/.local/share/xgem}"
 BIN_DIR="${XGEM_INSTALL_DIR:-$HOME/.local/bin}"
 
