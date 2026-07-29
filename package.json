@@ -1,0 +1,31 @@
+{
+  "name": "xgem-cli",
+  "version": "0.1.0",
+  "description": "Framework-aware automation CLI: scaffolds and runs clean/build/dev scripts per project type, plus a git workflow helper.",
+  "bin": {
+    "xgem": "./bin/xgem"
+  },
+  "files": [
+    "bin/xgem"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "engines": {
+    "node": ">=14"
+  },
+  "scripts": {
+    "test": "bash -n bin/xgem"
+  },
+  "keywords": [
+    "cli",
+    "automation",
+    "flutter",
+    "node",
+    "build",
+    "git"
+  ],
+  "author": "Paulo Michael",
+  "license": "MIT"
+}
