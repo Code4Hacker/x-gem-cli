@@ -16,9 +16,11 @@ and reconciles it automatically — see [Why the iOS build engine exists](#why-t
 ### Homebrew (macOS/Linux)
 
 ```sh
-brew tap <owner>/xgem
+brew tap Code4Hacker/xgem
 brew install xgem
 ```
+
+*(requires a separate `homebrew-xgem` tap repo and a tagged release — not set up yet)*
 
 ### npm
 
@@ -26,10 +28,12 @@ brew install xgem
 npm install -g xgem-cli
 ```
 
+*(not yet published to the npm registry)*
+
 ### curl
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Code4Hacker/x-gem-cli/xgem/install.sh | bash
 ```
 
 ## Usage
