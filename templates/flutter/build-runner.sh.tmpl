@@ -1,0 +1,4 @@
+#!/bin/bash
+# This file just delegates to xgem's native flutter engine (lib/flutter.sh)
+# so there's a single source of truth instead of two copies that can drift.
+exec xgem run flutter build-runner

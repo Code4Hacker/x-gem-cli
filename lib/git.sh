@@ -1,0 +1,156 @@
+#!/bin/bash
+# xgem git workflow helper: cmt / init / rm-remote / rm-branch.
+# Depends on lib/logger.sh.
+
+cmd_git_cmt() {
+    local commit_msg=$1
+    [ -n "$commit_msg" ] || die "Missing commit message!"
+
+    log_info "Checking repository status..."
+    git status -s
+    echo ""
+
+    local add_choice
+    read -r -p "Do you want to add ALL files (a) or INDIVIDUAL files (i)? [a/i]: " add_choice
+    if [[ "$add_choice" == "a" || "$add_choice" == "A" ]]; then
+        git add .
+        log_success "All files staged."
+    elif [[ "$add_choice" == "i" || "$add_choice" == "I" ]]; then
+        local -a specific_files
+        read -r -p "Enter specific file paths to add (space separated): " -a specific_files
+        git add "${specific_files[@]}"
+        log_success "Selected files staged."
+    else
+        die "Invalid choice. Operation aborted."
+    fi
+
+    log_info "Committing changes..."
+    if ! git commit -m "$commit_msg"; then
+        die "Commit failed. Aborting before pull/push."
+    fi
+
+    local current_branch remote_name
+    current_branch=$(git branch --show-current 2>/dev/null)
+    if git remote | grep -q "^origin$"; then
+        remote_name="origin"
+    else
+        remote_name=$(git remote | head -n 1)
+    fi
+
+    if [ -z "$remote_name" ]; then
+        log_warn "Local commit dropped cleanly, but no remote is configured — sync was skipped."
+        return 0
+    fi
+
+    log_info "Pulling updates from remote '$remote_name' on '$current_branch' via rebase..."
+    if ! git pull --rebase "$remote_name" "$current_branch"; then
+        log_error "MERGE CONFLICT DETECTED!"
+        log_warn "Execution paused. Resolve conflicts to proceed."
+        local open_editor
+        read -r -p "Do you want to open VS Code to resolve this now? (y/n): " open_editor
+        [[ "$open_editor" == "y" || "$open_editor" == "Y" ]] && code .
+        exit 1
+    fi
+
+    log_success "Clean sync pull achieved. Pushing to upstream target..."
+    if git push "$remote_name" "$current_branch"; then
+        log_success "Git workflow complete! Code cleanly committed and synchronized."
+    else
+        die "Push operation failed."
+    fi
+}
+
+cmd_git_init() {
+    log_info "Initializing local Git repository..."
+    git init
+
+    local remote_name="origin" remote_url user_remote_name branch_name
+    read -r -p "Enter remote repository URL: " remote_url
+    if [ -n "$remote_url" ]; then
+        read -r -p "Enter remote name (default: origin): " user_remote_name
+        [ -n "$user_remote_name" ] && remote_name="$user_remote_name"
+
+        if git remote | grep -q "^$remote_name$"; then
+            git remote set-url "$remote_name" "$remote_url"
+            log_success "Remote '$remote_name' already existed. URL updated."
+        else
+            git remote add "$remote_name" "$remote_url"
+            log_success "Remote '$remote_name' successfully added."
+        fi
+    fi
+
+    read -r -p "Enter branch name (default: main): " branch_name
+    branch_name=${branch_name:-main}
+    git branch -M "$branch_name"
+
+    git add .
+    git commit -m "initial changes" 2>/dev/null
+    log_success "Local baseline configuration setup completed."
+}
+
+cmd_git_rm_remote() {
+    log_info "Current configured remotes:"
+    git remote -v
+    echo ""
+
+    local remote_name
+    read -r -p "Enter the short remote name to remove (e.g. origin): " remote_name
+    remote_name=${remote_name:-origin}
+
+    if git remote | grep -q "^$remote_name$"; then
+        git remote remove "$remote_name"
+        log_success "Successfully removed remote reference configuration: $remote_name"
+    else
+        die "Remote tracking short-name '$remote_name' does not exist."
+    fi
+}
+
+cmd_git_rm_branch() {
+    local target_branch
+    read -r -p "Enter the name of the branch you want to target: " target_branch
+    [ -n "$target_branch" ] || die "Branch name cannot be empty."
+
+    local where_choice
+    read -r -p "Where do you want to delete this branch? (l = local only, r = remote only, b = both) [l/r/b]: " where_choice
+    echo ""
+
+    if [[ "$where_choice" =~ ^[lLbB]$ ]]; then
+        local current_branch
+        current_branch=$(git branch --show-current 2>/dev/null)
+        if [ "$current_branch" = "$target_branch" ]; then
+            log_warn "You are currently sitting on '$target_branch'. Switching to safe branch..."
+            git checkout main 2>/dev/null || git checkout master 2>/dev/null || git checkout dev 2>/dev/null
+        fi
+
+        log_info "Force deleting local branch '$target_branch'..."
+        if git branch -D "$target_branch"; then
+            log_success "Successfully deleted local copy of branch."
+        else
+            log_warn "Local branch could not be dropped (it may already be gone)."
+        fi
+    fi
+
+    if [[ "$where_choice" =~ ^[rRbB]$ ]]; then
+        local remote_target
+        read -r -p "Enter remote identifier (short-name like 'origin'): " remote_target
+        remote_target=${remote_target:-origin}
+
+        log_info "Sending deletion request for remote branch '$target_branch' to server..."
+        if git push "$remote_target" --delete "$target_branch"; then
+            log_success "Successfully wiped out remote branch '$target_branch' from server."
+        else
+            die "Server rejected the branch drop execution request."
+        fi
+    fi
+}
+
+# xgem git <cmt|init|rm-remote|rm-branch> ...
+cmd_git() {
+    case "$1" in
+        cmt)       cmd_git_cmt "$2" ;;
+        init)      cmd_git_init ;;
+        rm-remote) cmd_git_rm_remote ;;
+        rm-branch) cmd_git_rm_branch ;;
+        *) die "Unknown git subcommand '$1'. Usage: xgem git <cmt|init|rm-remote|rm-branch>" ;;
+    esac
+}

@@ -1,12 +1,14 @@
 {
   "name": "xgem-cli",
-  "version": "0.1.0",
-  "description": "Framework-aware automation CLI: scaffolds and runs clean/build/dev scripts per project type, plus a git workflow helper.",
+  "version": "2.0.0-alpha",
+  "description": "Framework-aware automation CLI: scaffolds and runs clean/build/dev scripts per project type, an environment doctor, a SwiftPM-aware iOS build engine, and a git workflow helper.",
   "bin": {
     "xgem": "./bin/xgem"
   },
   "files": [
-    "bin/xgem"
+    "bin/xgem",
+    "lib",
+    "templates"
   ],
   "os": [
     "darwin",
@@ -16,7 +18,7 @@
     "node": ">=14"
   },
   "scripts": {
-    "test": "bash -n bin/xgem"
+    "test": "bash -n bin/xgem && for f in lib/*.sh; do bash -n \"$f\"; done"
   },
   "keywords": [
     "cli",
