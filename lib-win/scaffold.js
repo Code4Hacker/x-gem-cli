@@ -7,7 +7,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { logInfo, logSuccess, logWarn, logError, die } = require('./logger');
 
-const ALL_FRAMEWORKS = ['flutter', 'node', 'python', 'react', 'vue', 'angular', 'go', 'rust', 'docker'];
+const ALL_FRAMEWORKS = ['flutter', 'node', 'python', 'react', 'vue', 'angular', 'next', 'go', 'rust', 'docker'];
 
 const FRAMEWORK_SCRIPTS = {
     flutter: ['hard-clean', 'build', 'build-runner'],
@@ -16,6 +16,7 @@ const FRAMEWORK_SCRIPTS = {
     react: ['hard-clean', 'build', 'dev'],
     vue: ['hard-clean', 'build', 'dev'],
     angular: ['hard-clean', 'build', 'dev'],
+    next: ['hard-clean', 'build', 'dev'],
     go: ['hard-clean', 'build'],
     rust: ['hard-clean', 'build'],
     docker: ['hard-clean', 'build-up'],
@@ -27,7 +28,7 @@ function frameworkScripts(fw) {
 
 function templateDir(fw) {
     const templatesRoot = path.join(__dirname, '..', 'templates-win');
-    if (fw === 'react' || fw === 'vue' || fw === 'angular') {
+    if (fw === 'react' || fw === 'vue' || fw === 'angular' || fw === 'next') {
         return path.join(templatesRoot, 'webframework');
     }
     return path.join(templatesRoot, fw);

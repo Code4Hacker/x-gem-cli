@@ -204,6 +204,7 @@ async function main() {
         case 'react':
         case 'vue':
         case 'angular':
+        case 'next':
         case 'go':
         case 'rust':
         case 'docker':

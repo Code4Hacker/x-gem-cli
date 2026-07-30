@@ -1,10 +1,14 @@
 # xgem
 
-A framework-aware automation CLI. `xgem init` scaffolds clean/build/dev scripts
-tailored to your project type (Flutter, Node, Python, React/Vue/Angular, Go,
-Rust, Docker, Swift), `xgem run <framework> <script>` runs them, `xgem doctor`
-reports on your environment, and `xgem git` wraps a common stage → commit →
-rebase-pull → push workflow.
+A framework-aware automation CLI. `xgem init` can create a brand-new project
+(real `npm create vite`/`create-next-app`/`create-vue`/`ng new`/`flutter create`
+scaffolding, framework-specific questions, dependency install, and launching
+the dev server in your browser or the app on a picked device/simulator) or
+just scaffold clean/build/dev scripts into a project you already have
+(Flutter, Node, Python, React/Vue/Angular/Next, Go, Rust, Docker, Swift).
+`xgem run <framework> <script>` runs those scripts, `xgem doctor` reports on
+your environment, and `xgem git` wraps a common stage → commit → rebase-pull
+→ push workflow.
 
 Flutter's iOS builds go through a dedicated engine that detects whether your
 project uses CocoaPods or Swift Package Manager (SPM), figures out the actual
@@ -59,7 +63,36 @@ Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), 
 
 ## Supported frameworks
 
-flutter, node, python, react, vue, angular, go, rust, docker, swift
+flutter, node, python, react, vue, angular, next, go, rust, docker, swift
+
+## Creating a new project
+
+`xgem init` asks, per framework, whether to create a brand-new project or use
+what's already in the directory:
+
+- **react**: Vite or Create React App ("the normal version"), then TypeScript
+  or JavaScript, then current directory or a new folder.
+- **vue** / **next**: runs the official `create-vue`/`create-next-app` wizard
+  directly, so you get their own real prompts (router, Tailwind, App Router,
+  etc.) rather than a re-implementation of them.
+- **angular**: `ng new` (via a local Angular CLI if you have one, `npx
+  @angular/cli` otherwise).
+- **flutter**: `flutter create`, then lists available devices/simulators
+  (falling back to available-but-not-booted emulators you can launch) and
+  runs on whichever you pick.
+- **node/python/go/rust/docker/swift**: the ecosystem's own minimal init
+  command (`npm init`, a `.venv`, `cargo new`, `go mod init`, a starter
+  Dockerfile, `swift package init`) — no sub-wizard, since these don't have
+  an equivalent "dev server" to launch.
+
+For the frameworks with a dev server (react/vue/angular/next), after
+dependencies install xgem offers to start it and open your default browser —
+it tails the server's own log for the first `http://localhost:PORT` it
+prints rather than guessing a framework's default port, so it works even if
+that port's already taken and a different one gets picked.
+
+Answering "existing" (the default) skips all of this and behaves exactly
+like before — just scaffolds `.xgem-automate/` into the current directory.
 
 ## Architecture
 
@@ -73,6 +106,7 @@ lib/
   flutter.sh   flutter command group (build/hard-clean/build-runner), delegates iOS builds to ios.sh
   git.sh       git cmt/init/branch/rm-remote/rm-branch
   scaffold.sh  generic clean/build/dev handling for the other, simpler frameworks
+  create.sh    project creation wizards (react/vue/angular/next/simple frameworks)
 templates/     the actual clean/build/dev script content xgem scaffolds into your project's .xgem-automate/
 ```
 
@@ -134,6 +168,8 @@ Deferred to a follow-up pass, not yet in this release:
 - Shell completions, `--json` output, per-project config caching (stop re-prompting
   build name/number/platform every run)
 - Deeper Android SDK/Java detection
+- Project creation wizards on the Windows engine (`lib-win/`) — react/vue/angular/next
+  scaffolding is pure Node.js tooling and would work fine there too, just not built yet
 
 ## License
 

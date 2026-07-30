@@ -237,3 +237,106 @@ flutter_run_native_command() {
         *) die "No native flutter command for '$script'." ;;
     esac
 }
+
+# create_flutter_project — used by lib/create.sh's create_project_wizard.
+# `flutter create` needs a target dir; "." scaffolds into the current one.
+create_flutter_project() {
+    require_cmd flutter "Install Flutter: https://docs.flutter.dev/get-started/install"
+    local project_dir
+    project_dir=$(_prompt_project_location "Flutter")
+    if [ "$project_dir" = "." ]; then
+        flutter create . || die "flutter create failed."
+    else
+        flutter create "$project_dir" || die "flutter create failed."
+        cd "$project_dir" || die "Could not enter $project_dir"
+    fi
+    _flutter_offer_run_on_device
+}
+
+# _flutter_select_device -> echoes the chosen device id, or nothing if
+# none available/selected. Uses `flutter devices --machine` (JSON) parsed
+# with python3 — already a soft dependency elsewhere in lib/ios.sh for the
+# same reason (no jq assumed present).
+_flutter_select_device() {
+    require_cmd python3 "Needed to parse 'flutter devices --machine' output."
+    local devices_json_file
+    devices_json_file=$(mktemp)
+    flutter devices --machine > "$devices_json_file" 2>/dev/null
+
+    local -a ids=() labels=()
+    while IFS='|' read -r id label; do
+        [ -n "$id" ] || continue
+        ids+=("$id")
+        labels+=("$label")
+    done < <(python3 - "$devices_json_file" <<'PYEOF'
+import json, sys
+
+try:
+    with open(sys.argv[1]) as f:
+        devices = json.load(f)
+except Exception:
+    devices = []
+
+for d in devices:
+    platform = d.get("platform") or d.get("targetPlatform") or ""
+    name = d.get("name", "unknown")
+    device_id = d.get("id", "")
+    print(f"{device_id}|{name} ({platform})")
+PYEOF
+)
+    rm -f "$devices_json_file"
+
+    if [ ${#ids[@]} -eq 0 ]; then
+        log_warn "No running devices/simulators found."
+        _flutter_offer_launch_emulator
+        return 1
+    fi
+
+    echo "Available devices:" >&2
+    local i
+    for i in "${!ids[@]}"; do
+        echo "$((i + 1))) ${labels[$i]}" >&2
+    done
+
+    local choice
+    read -r -p "Select a device [1-${#ids[@]}]: " choice
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt "${#ids[@]}" ]; then
+        log_warn "Invalid selection."
+        return 1
+    fi
+    echo "${ids[$((choice - 1))]}"
+}
+
+# No running devices — check for available-but-not-booted emulators and
+# offer to launch one, matching the "check available simulators... then
+# launch it" behavior the user asked for.
+_flutter_offer_launch_emulator() {
+    local emulators_output
+    emulators_output=$(flutter emulators 2>/dev/null)
+    [ -n "$emulators_output" ] || return 1
+
+    echo "$emulators_output"
+    local launch_choice
+    read -r -p "Launch one of these emulators? Enter its id, or leave blank to skip: " launch_choice
+    [ -n "$launch_choice" ] || return 1
+
+    log_info "Launching emulator '$launch_choice'..."
+    flutter emulators --launch "$launch_choice"
+    log_info "Waiting for it to boot..."
+    sleep 5
+}
+
+_flutter_offer_run_on_device() {
+    local run_choice
+    read -r -p "Run the app now on a device/simulator? (Y/n): " run_choice
+    run_choice=${run_choice:-y}
+    [[ "$run_choice" == "y" || "$run_choice" == "Y" ]] || return 0
+
+    local device_id
+    device_id=$(_flutter_select_device)
+    if [ -n "$device_id" ]; then
+        flutter run -d "$device_id"
+    else
+        log_warn "No device selected — run 'flutter run' manually once one is available."
+    fi
+}

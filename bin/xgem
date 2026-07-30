@@ -33,6 +33,8 @@ source "$XGEM_HOME/lib/ios.sh"
 source "$XGEM_HOME/lib/flutter.sh"
 # shellcheck source=lib/scaffold.sh
 source "$XGEM_HOME/lib/scaffold.sh"
+# shellcheck source=lib/create.sh
+source "$XGEM_HOME/lib/create.sh"
 
 CONFIG_DIR=".xgem-automate"
 
@@ -85,12 +87,12 @@ case "${1:-}" in
             log_warn "Workspace configuration layer already exists! Use 'xgem add' to append frameworks."
             exit 0
         fi
-        mkdir -p "$CONFIG_DIR"
-
         echo -e "\033[1;34mSelect your starting framework architecture:\033[0m"
         PS3="Enter target selection number: "
         select fw in "${ALL_FRAMEWORKS[@]}"; do
             if [ -n "$fw" ]; then
+                create_project_wizard "$fw"
+                mkdir -p "$CONFIG_DIR"
                 scaffold_inject_templates "$fw" "$CONFIG_DIR"
                 log_success "Successfully appended standard scripts for: $CONFIG_DIR/$fw"
                 break
@@ -108,6 +110,8 @@ case "${1:-}" in
             echo "$CONFIG_DIR/" > .gitignore
             log_success "Created .gitignore and hidden tracking layer folder references."
         fi
+
+        _ask_launch_dev_server
         exit 0
         ;;
 
@@ -198,7 +202,7 @@ case "${1:-}" in
         exit 0
         ;;
 
-    flutter|node|python|react|vue|angular|go|rust|docker|swift)
+    flutter|node|python|react|vue|angular|next|go|rust|docker|swift)
         TARGET_FW=$1
         TARGET_FW_UPPER=$(echo "$TARGET_FW" | tr '[:lower:]' '[:upper:]')
 

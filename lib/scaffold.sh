@@ -11,14 +11,14 @@
 #
 # Depends on lib/logger.sh and XGEM_HOME (set by bin/xgem).
 
-ALL_FRAMEWORKS=(flutter node python react vue angular go rust docker swift)
+ALL_FRAMEWORKS=(flutter node python react vue angular next go rust docker swift)
 
 framework_scripts() {
     case "$1" in
         flutter) echo "hard-clean build build-runner" ;;
         node)    echo "hard-clean build start" ;;
         python)  echo "hard-clean install" ;;
-        react|vue|angular) echo "hard-clean build dev" ;;
+        react|vue|angular|next) echo "hard-clean build dev" ;;
         go)      echo "hard-clean build" ;;
         rust)    echo "hard-clean build" ;;
         docker)  echo "hard-clean build-up" ;;
@@ -30,8 +30,8 @@ framework_scripts() {
 _scaffold_template_dir() {
     local framework=$1
     case "$framework" in
-        react|vue|angular) echo "$XGEM_HOME/templates/webframework" ;;
-        *)                 echo "$XGEM_HOME/templates/$framework" ;;
+        react|vue|angular|next) echo "$XGEM_HOME/templates/webframework" ;;
+        *)                      echo "$XGEM_HOME/templates/$framework" ;;
     esac
 }
 
