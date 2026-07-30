@@ -1,7 +1,7 @@
 #!/bin/bash
 # xgem version info.
 
-XGEM_VERSION="2.0.0-alpha.8"
+XGEM_VERSION="2.0.0-alpha.9"
 
 print_version() {
     echo "xgem $XGEM_VERSION"
