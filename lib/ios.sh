@@ -60,8 +60,13 @@ ios_deployment_target_for_config() {
 
     if has_cmd xcodebuild; then
         local value
+        # Anchored: newer Xcode also emits DEPLOYMENT_TARGET_SETTING_NAME =
+        # IPHONEOS_DEPLOYMENT_TARGET (a meta-setting whose *value* is that
+        # string), which an unanchored grep matches before the real
+        # "IPHONEOS_DEPLOYMENT_TARGET = 15.6" line — anchoring to the key
+        # position avoids grabbing that decoy.
         value=$(xcodebuild -showBuildSettings "${xcb_args[@]}" -configuration "$config" 2>/dev/null \
-            | grep -m1 'IPHONEOS_DEPLOYMENT_TARGET' | awk '{print $NF}')
+            | grep -m1 -E '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET[[:space:]]*=' | awk '{print $NF}')
         [ -n "$value" ] && { echo "$value"; return 0; }
     fi
 
@@ -80,15 +85,34 @@ ios_pbxproj_current_max_target() {
 }
 
 # ios_required_spm_deployment_target [project_dir]
-# Reads .dart_tool/package_config.json (written by `flutter pub get`) to
-# find every resolved package's own ios/Package.swift, and returns the
-# highest .iOS(.vNN) platform floor declared across them. This replaces
-# hardcoding a guessed value (e.g. "15.0") with an actual measurement of
-# what the resolved dependency graph requires.
+# Returns the highest .iOS(.vNN) platform floor declared across every
+# resolved SwiftPM plugin, instead of hardcoding a guessed value.
+#
+# Primary source: ios/Flutter/ephemeral/Packages/.packages/<name>-<version>/,
+# which `flutter pub get` itself populates with each SPM-enabled plugin as
+# part of dependency resolution — this is the actual, already-resolved
+# location Xcode/SPM uses, not a path we have to reconstruct. Scanning it
+# directly sidesteps having to guess each plugin's on-disk manifest layout
+# (which varies — not every plugin puts Package.swift at <root>/ios/).
+#
+# Falls back to parsing .dart_tool/package_config.json's rootUri entries
+# (assuming the common <root>/ios/Package.swift convention) only if that
+# ephemeral directory doesn't exist yet — e.g. before any pub get has run.
 ios_required_spm_deployment_target() {
     local project_dir=${1:-.}
-    local pkg_config="$project_dir/.dart_tool/package_config.json"
+    local packages_dir="$project_dir/ios/Flutter/ephemeral/Packages/.packages"
 
+    if [ -d "$packages_dir" ]; then
+        find "$packages_dir" -maxdepth 4 -name "Package.swift" -print0 2>/dev/null \
+            | xargs -0 grep -ohE '\.iOS\(\.v[0-9_]+\)' 2>/dev/null \
+            | grep -oE '[0-9]+(_[0-9]+)?' | tr '_' '.' \
+            | sort -g | tail -1
+        return 0
+    fi
+
+    log_debug "No resolved SwiftPM packages directory at $packages_dir yet; falling back to package_config.json."
+
+    local pkg_config="$project_dir/.dart_tool/package_config.json"
     [ -f "$pkg_config" ] || { log_debug "No .dart_tool/package_config.json — run flutter pub get first."; return 1; }
     has_cmd python3 || { log_debug "python3 not found; cannot parse package_config.json."; return 1; }
 

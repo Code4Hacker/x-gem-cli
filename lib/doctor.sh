@@ -26,7 +26,10 @@ flutter_supports_flag() {
 flutter_config_spm_enabled() {
     has_cmd flutter || { echo "unknown (flutter not found)"; return; }
     local line
-    line=$(flutter config 2>/dev/null | grep -i "swift-package-manager")
+    # Anchored to "enable-swift-package-manager:" (the current-value line)
+    # so this doesn't instead match the "--[no-]enable-swift-package-manager"
+    # flag-syntax help line that `flutter config` also prints.
+    line=$(flutter config 2>/dev/null | grep -im1 -E '^[[:space:]]*enable-swift-package-manager:')
     if [ -z "$line" ]; then
         echo "unknown (not reported by this Flutter version)"
     else
