@@ -103,9 +103,11 @@ ios_required_spm_deployment_target() {
     local packages_dir="$project_dir/ios/Flutter/ephemeral/Packages/.packages"
 
     if [ -d "$packages_dir" ]; then
-        find "$packages_dir" -maxdepth 4 -name "Package.swift" -print0 2>/dev/null \
-            | xargs -0 grep -ohE '\.iOS\(\.v[0-9_]+\)' 2>/dev/null \
-            | grep -oE '[0-9]+(_[0-9]+)?' | tr '_' '.' \
+        # -L: per-plugin dirs here are frequently symlinks into pub-cache;
+        # without -L, find silently skips descending into them.
+        find -L "$packages_dir" -maxdepth 4 -name "Package.swift" -print0 2>/dev/null \
+            | xargs -0 grep -ohE '\.iOS\(\.v[0-9_]+\)|\.iOS\("[0-9.]+"\)' 2>/dev/null \
+            | grep -oE '[0-9]+(\.[0-9]+)?(_[0-9]+)?' | tr '_' '.' \
             | sort -g | tail -1
         return 0
     fi
@@ -142,9 +144,12 @@ for pkg in data.get("packages", []):
     except OSError:
         continue
 
-    for m in re.finditer(r"\.iOS\(\.v(\d+(?:_\d+)?)\)", content):
+    # Both SPM syntaxes: enum .iOS(.v15) and string .iOS("15.0") (the form
+    # Flutter's own generator uses).
+    for m in re.finditer(r'\.iOS\(\.v(\d+(?:_\d+)?)\)|\.iOS\("(\d+(?:\.\d+)?)"\)', content):
+        raw = m.group(1) or m.group(2)
         try:
-            fv = float(m.group(1).replace("_", "."))
+            fv = float(raw.replace("_", "."))
         except ValueError:
             continue
         max_target = max(max_target, fv)
@@ -188,8 +193,24 @@ ios_generated_package_swift_path() {
         echo "$guess"
         return 0
     fi
-    find "$project_dir/ios" -maxdepth 6 -type f -name "Package.swift" \
+    # -L: plugin package directories under ephemeral/Packages/.packages are
+    # frequently symlinks into the pub-cache; a plain find silently skips
+    # symlinked directories instead of descending into them.
+    find -L "$project_dir/ios" -maxdepth 6 -type f -name "Package.swift" \
         -path "*FlutterGeneratedPluginSwiftPackage*" 2>/dev/null | head -1
+}
+
+# SPM's SupportedPlatform.iOS accepts two syntaxes: the enum form .iOS(.v15)
+# for the fixed known-version cases, and a string form .iOS("15.0") for
+# arbitrary versions — Flutter's own code generator uses the *string* form
+# for FlutterGeneratedPluginSwiftPackage, not the enum form. Matching only
+# the enum form (as an earlier version of this function did) means the
+# patch step silently never matches anything on a real generated package:
+# sed finds no match, writes back an identical file, and "succeeds" while
+# doing nothing.
+_ios_extract_platform_version() {
+    grep -oE '\.iOS\(\.v[0-9_]+\)|\.iOS\("[0-9.]+"\)' | head -1 \
+        | grep -oE '[0-9]+(\.[0-9]+)?(_[0-9]+)?' | tr '_' '.'
 }
 
 ios_generated_package_target() {
@@ -197,12 +218,15 @@ ios_generated_package_target() {
     local pkg
     pkg=$(ios_generated_package_swift_path "$project_dir")
     [ -n "$pkg" ] && [ -f "$pkg" ] || return 1
-    grep -oE '\.iOS\(\.v[0-9_]+\)' "$pkg" | head -1 | grep -oE '[0-9_]+' | tr '_' '.'
+    _ios_extract_platform_version < "$pkg"
 }
 
 # Last-resort workaround for the still-open upstream desync bug: directly
 # patch the generated package's platform declaration. Always logged loudly
 # — this is a documented workaround for a known bug, never a silent hack.
+# Writes the string form (.iOS("15.0")) since that's what Flutter's own
+# generator uses in this file — matching its existing convention rather
+# than introducing a different syntax.
 ios_patch_generated_package_target() {
     local new_target=$1
     local project_dir=${2:-.}
@@ -214,10 +238,9 @@ ios_patch_generated_package_target() {
     fi
 
     log_warn "Working around known Flutter SPM bug (flutter/flutter#186804): the regenerated package still doesn't match your deployment target, so patching it directly."
-    local token=${new_target//./_}
     local tmp
     tmp=$(mktemp)
-    sed -E "s/\.iOS\(\.v[0-9_]+\)/.iOS(.v${token})/g" "$pkg" > "$tmp"
+    sed -E "s/\.iOS\(\.v[0-9_]+\)/.iOS(\"${new_target}\")/g; s/\.iOS\(\"[0-9.]+\"\)/.iOS(\"${new_target}\")/g" "$pkg" > "$tmp"
     mv "$tmp" "$pkg"
     log_success "Patched generated package platform to iOS $new_target."
 }
@@ -227,6 +250,21 @@ ios_regenerate_generated_package() {
     log_info "Clearing ephemeral iOS config to force a clean regeneration..."
     rm -rf "$project_dir/ios/Flutter/ephemeral"
     ( cd "$project_dir" && flutter pub get )
+}
+
+# ios_parse_required_from_build_log <log_file>
+# Statically scanning plugin manifests to predict the required deployment
+# target has proven unreliable in practice (plugin authors structure SPM
+# manifests differently, package dirs can be symlinks, etc.). Xcode itself
+# always computes this correctly and states it plainly in its own error:
+# "requires minimum platform version X for the iOS platform". Parsing that
+# directly is the authoritative fallback when the static pre-check misses
+# something.
+ios_parse_required_from_build_log() {
+    local log_file=$1
+    grep -oE "requires minimum platform version [0-9]+(\.[0-9]+)?" "$log_file" 2>/dev/null \
+        | grep -oE '[0-9]+(\.[0-9]+)?' \
+        | sort -g | tail -1
 }
 
 ios_known_issue_check() {

@@ -105,7 +105,7 @@ _flutter_build_ios() {
     mkdir -p "$archive_dir"
     archive_path="$archive_dir/Runner $archive_time.xcarchive"
 
-    if ! xcodebuild -workspace ios/Runner.xcworkspace \
+    local -a archive_cmd=(xcodebuild -workspace ios/Runner.xcworkspace \
         -scheme Runner \
         -sdk iphoneos \
         -configuration Release \
@@ -113,10 +113,35 @@ _flutter_build_ios() {
         -archivePath "$archive_path" \
         "BUILD_NUMBER=$build_number" \
         "MARKETING_VERSION=$build_name" \
-        -allowProvisioningUpdates > "$log_file" 2>&1; then
-        log_error "Archive FAILED"
-        cat "$log_file"
-        die "xcodebuild archive failed" "$?"
+        -allowProvisioningUpdates)
+
+    if ! "${archive_cmd[@]}" > "$log_file" 2>&1; then
+        # Static pre-checks can miss cases the real SwiftPM resolution
+        # catches (different plugin manifest layouts, symlinked package
+        # dirs, etc.) — Xcode's own error is authoritative, so parse it
+        # directly and retry once before giving up.
+        local retry_required
+        retry_required=$(ios_parse_required_from_build_log "$log_file")
+        if [ -n "$retry_required" ]; then
+            log_warn "Archive failed on a SwiftPM platform-version mismatch Xcode reports directly (requires iOS $retry_required). Retrying with that applied..."
+            ios_pbxproj_patch_deployment_target "$retry_required" "."
+            ios_regenerate_generated_package "."
+            local regenerated
+            regenerated=$(ios_generated_package_target ".")
+            if [ -z "$regenerated" ] || _ios_ver_lt "$regenerated" "$retry_required"; then
+                ios_patch_generated_package_target "$retry_required" "."
+            fi
+
+            if ! "${archive_cmd[@]}" > "$log_file" 2>&1; then
+                log_error "Archive FAILED again after retry"
+                cat "$log_file"
+                die "xcodebuild archive failed" "$?"
+            fi
+        else
+            log_error "Archive FAILED"
+            cat "$log_file"
+            die "xcodebuild archive failed" "$?"
+        fi
     fi
     log_success "Archive created at: $archive_path"
 
