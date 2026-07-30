@@ -164,7 +164,7 @@ function printFrameworkHelp(fw) {
     }
     if (fw === 'flutter') {
         console.log('');
-        logInfo("Flutter builds on Windows support APK and Windows desktop targets. Run 'xgem doctor ios' for why iOS/macOS aren't available here.");
+        logInfo("Flutter builds on Windows support APK, App Bundle, and Windows desktop targets. Run 'xgem doctor ios' for why iOS/macOS aren't available here.");
     }
     console.log('');
 }

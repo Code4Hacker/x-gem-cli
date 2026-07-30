@@ -189,20 +189,21 @@ cmd_flutter_build() {
     echo ""
     echo "Select Target Platform:"
     echo "1) APK (Android)"
-    echo "2) iOS"
-    echo "3) macOS"
-    echo "4) Windows"
-    echo "5) Linux"
+    echo "2) App Bundle (Android, .aab — required for Play Store uploads)"
+    echo "3) iOS"
+    echo "4) macOS"
+    echo "5) Windows"
+    echo "6) Linux"
     local platform_choice
-    read -r -p "Choose [1-5]: " platform_choice
-    if ! [[ "$platform_choice" =~ ^[1-5]$ ]]; then
+    read -r -p "Choose [1-6]: " platform_choice
+    if ! [[ "$platform_choice" =~ ^[1-6]$ ]]; then
         die "Invalid platform choice '$platform_choice'."
     fi
 
     local mode="--release"
     [[ "$is_release" == "n" || "$is_release" == "N" ]] && mode="--debug"
 
-    if [ "$platform_choice" -eq 2 ]; then
+    if [ "$platform_choice" -eq 3 ]; then
         _flutter_build_ios "$build_name" "$build_number" "$mode"
         return
     fi
@@ -210,9 +211,10 @@ cmd_flutter_build() {
     log_info "Initializing Flutter Build ($mode) for version $build_name+$build_number..."
     case $platform_choice in
         1) flutter build apk "$mode" "--build-name=$build_name" "--build-number=$build_number" ;;
-        3) flutter build macos "$mode" "--build-name=$build_name" "--build-number=$build_number" ;;
-        4) flutter build windows "$mode" "--build-name=$build_name" "--build-number=$build_number" ;;
-        5) flutter build linux "$mode" "--build-name=$build_name" "--build-number=$build_number" ;;
+        2) flutter build appbundle "$mode" "--build-name=$build_name" "--build-number=$build_number" ;;
+        4) flutter build macos "$mode" "--build-name=$build_name" "--build-number=$build_number" ;;
+        5) flutter build windows "$mode" "--build-name=$build_name" "--build-number=$build_number" ;;
+        6) flutter build linux "$mode" "--build-name=$build_name" "--build-number=$build_number" ;;
     esac
 }
 

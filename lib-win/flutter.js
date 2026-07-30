@@ -67,9 +67,10 @@ async function cmdBuild() {
 
     console.log('\nSelect Target Platform:');
     console.log('1) APK (Android)');
-    console.log('2) Windows');
+    console.log('2) App Bundle (Android, .aab — required for Play Store uploads)');
+    console.log('3) Windows');
     console.log('(iOS/macOS require a Mac; Linux desktop can\'t be cross-built from Windows.)');
-    const platformChoice = await prompt('Choose [1-2]');
+    const platformChoice = await prompt('Choose [1-3]');
 
     const mode = (isRelease === 'n') ? '--debug' : '--release';
     const buildArgs = [`--build-name=${buildName}`, `--build-number=${buildNumber}`];
@@ -78,6 +79,9 @@ async function cmdBuild() {
         logInfo(`Building APK (${mode})...`);
         flutter(['build', 'apk', mode, ...buildArgs]);
     } else if (platformChoice === '2') {
+        logInfo(`Building App Bundle (${mode})...`);
+        flutter(['build', 'appbundle', mode, ...buildArgs]);
+    } else if (platformChoice === '3') {
         logInfo(`Building Windows desktop app (${mode})...`);
         flutter(['build', 'windows', mode, ...buildArgs]);
     } else {

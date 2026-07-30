@@ -115,7 +115,7 @@ engine (`lib-win/`, driven by `bin/xgem.js`) so `npm install -g xgem-cli` actual
 in `cmd.exe`/PowerShell, no WSL required.
 
 What works on Windows: `init`/`add`/`run`/`terminate`, `doctor`, the git workflow
-commands, and Flutter builds for **APK and Windows desktop** targets. What doesn't:
+commands, and Flutter builds for **APK, App Bundle, and Windows desktop** targets. What doesn't:
 Flutter **iOS/macOS** builds — Xcode has no Windows equivalent, so `xgem doctor ios`
 explains that plainly instead of pretending. `swift` isn't offered as a framework
 choice on Windows for the same reason. If you're inside WSL, none of this applies —
