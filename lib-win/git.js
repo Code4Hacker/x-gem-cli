@@ -41,25 +41,45 @@ async function cmdCmt(commitMsg) {
         die('Invalid choice. Operation aborted.');
     }
 
-    logInfo('Committing changes...');
-    const commitResult = git(['commit', '-m', commitMsg]);
-    if (commitResult.status !== 0) {
-        die('Commit failed. Aborting before pull/push.');
+    const hasStaged = spawnSync('git', ['diff', '--cached', '--quiet']).status !== 0;
+    if (!hasStaged) {
+        logWarn("Nothing staged to commit — checking whether there's anything already committed to sync.");
+    } else {
+        logInfo('Committing changes...');
+        const commitResult = git(['commit', '-m', commitMsg]);
+        if (commitResult.status !== 0) {
+            die('Commit failed. Aborting before pull/push.');
+        }
     }
 
     const currentBranch = gitCapture(['branch', '--show-current']);
     const remoteName = remoteExists('origin') ? 'origin' : gitCapture(['remote']).split(/\r?\n/)[0];
 
     if (!remoteName) {
-        logWarn('Local commit dropped cleanly, but no remote is configured — sync was skipped.');
+        logWarn('No remote configured — sync was skipped.');
+        return;
+    }
+
+    const aheadCount = gitCapture(['rev-list', '--count', `${remoteName}/${currentBranch}..${currentBranch}`]);
+    if (aheadCount === '0') {
+        logSuccess(`Already up to date with '${remoteName}/${currentBranch}' — nothing to push.`);
         return;
     }
 
     logInfo(`Pulling updates from remote '${remoteName}' on '${currentBranch}' via rebase...`);
     const pullResult = git(['pull', '--rebase', remoteName, currentBranch]);
     if (pullResult.status !== 0) {
-        logError('MERGE CONFLICT DETECTED!');
-        logWarn('Execution paused. Resolve conflicts to proceed.');
+        const gitDir = gitCapture(['rev-parse', '--git-dir']);
+        const path = require('node:path');
+        const fs = require('node:fs');
+        const inConflict = fs.existsSync(path.join(gitDir, 'rebase-merge')) || fs.existsSync(path.join(gitDir, 'rebase-apply'));
+        if (inConflict) {
+            logError('MERGE CONFLICT DETECTED!');
+            logWarn('Execution paused. Resolve conflicts to proceed.');
+        } else {
+            logError(`Could not sync with '${remoteName}' — this looks like a connection problem, not a merge conflict (see the git error above).`);
+            logWarn(`Your commit is safe locally. Re-run 'xgem git cmt' once connectivity is restored, or push manually: git push ${remoteName} ${currentBranch}`);
+        }
         process.exit(1);
     }
 

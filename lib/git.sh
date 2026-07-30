@@ -24,9 +24,13 @@ cmd_git_cmt() {
         die "Invalid choice. Operation aborted."
     fi
 
-    log_info "Committing changes..."
-    if ! git commit -m "$commit_msg"; then
-        die "Commit failed. Aborting before pull/push."
+    if git diff --cached --quiet; then
+        log_warn "Nothing staged to commit — checking whether there's anything already committed to sync."
+    else
+        log_info "Committing changes..."
+        if ! git commit -m "$commit_msg"; then
+            die "Commit failed. Aborting before pull/push."
+        fi
     fi
 
     local current_branch remote_name
@@ -38,14 +42,29 @@ cmd_git_cmt() {
     fi
 
     if [ -z "$remote_name" ]; then
-        log_warn "Local commit dropped cleanly, but no remote is configured — sync was skipped."
+        log_warn "No remote configured — sync was skipped."
+        return 0
+    fi
+
+    local ahead_count
+    ahead_count=$(git rev-list --count "$remote_name/$current_branch..$current_branch" 2>/dev/null)
+    if [ "$ahead_count" = "0" ]; then
+        log_success "Already up to date with '$remote_name/$current_branch' — nothing to push."
         return 0
     fi
 
     log_info "Pulling updates from remote '$remote_name' on '$current_branch' via rebase..."
     if ! git pull --rebase "$remote_name" "$current_branch"; then
-        log_error "MERGE CONFLICT DETECTED!"
-        log_warn "Execution paused. Resolve conflicts to proceed."
+        local git_dir
+        git_dir=$(git rev-parse --git-dir 2>/dev/null)
+        if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ]; then
+            log_error "MERGE CONFLICT DETECTED!"
+            log_warn "Execution paused. Resolve conflicts to proceed."
+        else
+            log_error "Could not sync with '$remote_name' — this looks like a connection problem, not a merge conflict (see the git error above)."
+            log_warn "Your commit is safe locally. Re-run 'xgem git cmt' once connectivity is restored, or push manually: git push $remote_name $current_branch"
+            exit 1
+        fi
         local open_editor
         read -r -p "Do you want to open VS Code to resolve this now? (y/n): " open_editor
         [[ "$open_editor" == "y" || "$open_editor" == "Y" ]] && code .
