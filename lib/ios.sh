@@ -206,13 +206,23 @@ ios_regenerate_generated_package() {
 }
 
 ios_known_issue_check() {
-    log_warn "Known upstream issue (flutter/flutter#186804, #189422, #162072): FlutterGeneratedPluginSwiftPackage's deployment target can desync from your app's IPHONEOS_DEPLOYMENT_TARGET. Currently open — xgem detects and works around it automatically below."
+    log_warn "Known upstream issue (flutter/flutter#186804, #189422, #162072): FlutterGeneratedPluginSwiftPackage's deployment target can desync from your app's IPHONEOS_DEPLOYMENT_TARGET — independently, even when the app's own target is already high enough. Currently open — xgem detects and works around it automatically below."
+}
+
+# _ios_ver_lt a b -> true if a < b, numeric comparison (not string equality,
+# since "15" and "15.0" are the same version but different strings).
+_ios_ver_lt() {
+    awk -v a="$1" -v b="$2" 'BEGIN{exit !(a<b)}'
 }
 
 # ios_reconcile_deployment_target [project_dir]
-# The core "self-healing" step: detect a required-vs-current mismatch, plan
-# the fix, confirm (unless --yes/--dry-run), apply, regenerate, verify, and
-# fall back to the documented workaround if the upstream bug is still biting.
+# The core "self-healing" step. Checks TWO independent things against the
+# required version — the app's own pbxproj target, AND
+# FlutterGeneratedPluginSwiftPackage's own declared platform — because the
+# upstream bug is exactly that these two can desync from each other. A
+# project whose pbxproj is already at (say) 15.6 can still have a generated
+# package stuck at 13.0; checking only the pbxproj target (as an earlier
+# version of this function did) misses that case entirely.
 # Returns 0 if no action was needed or the fix succeeded; 1 if it couldn't
 # reconcile and the caller should stop before attempting a build.
 ios_reconcile_deployment_target() {
@@ -220,46 +230,53 @@ ios_reconcile_deployment_target() {
 
     ios_project_uses_spm "$project_dir" || { log_debug "Project does not use SwiftPM; skipping deployment-target reconciliation."; return 0; }
 
-    local required current
+    local required
     required=$(ios_required_spm_deployment_target "$project_dir")
-    current=$(ios_deployment_target_for_config "Release" "$project_dir")
-
     if [ -z "$required" ]; then
         log_debug "Could not determine a required deployment target from resolved SPM plugins; skipping reconciliation."
-        return 0
-    fi
-    if [ -z "$current" ]; then
-        log_warn "Could not determine the project's current deployment target; proceeding without reconciliation."
         return 0
     fi
 
     ios_known_issue_check
 
-    if awk -v a="$required" -v b="$current" 'BEGIN{exit !(a>b)}'; then
-        log_warn "Resolved SwiftPM plugins require iOS $required, but the project targets iOS $current."
-        echo "Plan:"
-        echo "  1. Set IPHONEOS_DEPLOYMENT_TARGET = $required across every build configuration in project.pbxproj"
-        echo "  2. Clear ios/Flutter/ephemeral and re-run 'flutter pub get' to regenerate FlutterGeneratedPluginSwiftPackage"
-        echo "  3. Verify the regenerated package declares iOS $required; if it still doesn't (known upstream bug), patch it directly"
+    local current generated
+    current=$(ios_deployment_target_for_config "Release" "$project_dir")
+    generated=$(ios_generated_package_target "$project_dir")
 
-        if ! confirm "Apply this fix?"; then
-            log_warn "Skipped. The build will likely fail SwiftPM resolution until the deployment target is reconciled manually."
-            return 1
-        fi
+    local pbxproj_needs_bump=0 generated_needs_fix=0
+    [ -n "$current" ] && _ios_ver_lt "$current" "$required" && pbxproj_needs_bump=1
+    if [ -z "$generated" ] || _ios_ver_lt "$generated" "$required"; then
+        generated_needs_fix=1
+    fi
 
-        ios_pbxproj_patch_deployment_target "$required" "$project_dir"
-        ios_regenerate_generated_package "$project_dir"
+    if [ "$pbxproj_needs_bump" = 0 ] && [ "$generated_needs_fix" = 0 ]; then
+        log_debug "Deployment target ($current) and generated package ($generated) already satisfy SwiftPM requirement ($required)."
+        return 0
+    fi
 
-        local regenerated
-        regenerated=$(ios_generated_package_target "$project_dir")
-        if [ "$regenerated" = "$required" ]; then
-            log_success "Generated package now correctly declares iOS $regenerated."
-        else
-            log_warn "Generated package declares '${regenerated:-unknown}' after regeneration, not $required."
-            ios_patch_generated_package_target "$required" "$project_dir"
-        fi
+    log_warn "Resolved SwiftPM plugins require iOS $required."
+    [ "$pbxproj_needs_bump" = 1 ] && echo "  - project.pbxproj currently targets iOS $current"
+    [ "$generated_needs_fix" = 1 ] && echo "  - FlutterGeneratedPluginSwiftPackage currently declares iOS ${generated:-unknown}"
+    echo "Plan:"
+    [ "$pbxproj_needs_bump" = 1 ] && echo "  1. Set IPHONEOS_DEPLOYMENT_TARGET = $required across every build configuration in project.pbxproj"
+    echo "  2. Clear ios/Flutter/ephemeral and re-run 'flutter pub get' to regenerate FlutterGeneratedPluginSwiftPackage"
+    echo "  3. Verify the regenerated package declares iOS $required; if it still doesn't (known upstream bug), patch it directly"
+
+    if ! confirm "Apply this fix?"; then
+        log_warn "Skipped. The build will likely fail SwiftPM resolution until this is reconciled manually."
+        return 1
+    fi
+
+    [ "$pbxproj_needs_bump" = 1 ] && ios_pbxproj_patch_deployment_target "$required" "$project_dir"
+    ios_regenerate_generated_package "$project_dir"
+
+    local regenerated
+    regenerated=$(ios_generated_package_target "$project_dir")
+    if [ -n "$regenerated" ] && ! _ios_ver_lt "$regenerated" "$required"; then
+        log_success "Generated package now correctly declares iOS $regenerated."
     else
-        log_debug "Deployment target ($current) already satisfies SwiftPM requirement ($required)."
+        log_warn "Generated package declares '${regenerated:-unknown}' after regeneration, still below $required."
+        ios_patch_generated_package_target "$required" "$project_dir"
     fi
 
     return 0

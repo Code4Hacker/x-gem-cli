@@ -66,13 +66,18 @@ _flutter_build_ios() {
 
     require_cmd xcodebuild "iOS builds require Xcode's command-line tools."
 
+    # Must run pub get BEFORE reconciling: the required-deployment-target
+    # check reads .dart_tool/package_config.json, and that file only
+    # reflects the plugin versions actually in use after a fresh pub get.
+    # Reconciling against a stale package_config.json can silently pass a
+    # check that the real, just-resolved dependency graph would fail.
+    log_info "Regenerating dependencies..."
+    flutter pub get
+
     log_info "Reconciling iOS deployment target against resolved SwiftPM plugins..."
     if ! ios_reconcile_deployment_target "."; then
         die "iOS deployment target could not be reconciled; aborting before build."
     fi
-
-    log_info "Regenerating dependencies..."
-    flutter pub get
 
     if ios_project_uses_pods "."; then
         log_info "CocoaPods detected - installing pods..."

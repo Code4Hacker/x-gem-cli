@@ -86,12 +86,20 @@ doctor_print_ios() {
         echo "Deployment target [$cfg]: ${t:-unknown}"
     done
 
-    local required
+    local required generated
     required=$(ios_required_spm_deployment_target "$project_dir" 2>/dev/null)
     if [ -n "$required" ]; then
         echo "Required by resolved SwiftPM plugins: $required"
     else
         echo "Required by resolved SwiftPM plugins: unable to determine (run 'flutter pub get' first, or no SPM plugins declare an explicit floor)"
+    fi
+
+    if [ "$uses_spm" = "yes" ]; then
+        generated=$(ios_generated_package_target "$project_dir" 2>/dev/null)
+        echo "FlutterGeneratedPluginSwiftPackage declares: ${generated:-unknown}"
+        if [ -n "$required" ] && [ -n "$generated" ] && _ios_ver_lt "$generated" "$required"; then
+            log_warn "This is stale — it declares iOS $generated but plugins need $required. This can happen even when your app's own deployment target is already high enough; 'xgem run flutter build' will detect and fix this."
+        fi
     fi
 
     if [ "$uses_spm" = "yes" ]; then
