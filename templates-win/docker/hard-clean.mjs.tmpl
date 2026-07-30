@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { execSync } from 'node:child_process';
+console.log('Pruning unused Docker assets and volumes...');
+execSync('docker system prune -a --volumes -f', { stdio: 'inherit' });

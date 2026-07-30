@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+// Delegates to xgem's native Windows flutter engine — single source of
+// truth instead of a second copy of the logic.
+import { spawnSync } from 'node:child_process';
+const r = spawnSync('xgem', ['run', 'flutter', 'hard-clean'], { stdio: 'inherit', shell: true });
+process.exit(r.status ?? 0);

@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+const r = spawnSync('xgem', ['run', 'flutter', 'build-runner'], { stdio: 'inherit', shell: true });
+process.exit(r.status ?? 0);

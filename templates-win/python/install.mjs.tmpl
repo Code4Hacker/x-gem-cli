@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
+// Windows venvs don't have an "activate && run" equivalent worth using in
+// a spawned process — call the venv's own pip.exe directly instead.
+if (existsSync('.venv\\Scripts\\pip.exe')) {
+    execSync('.venv\\Scripts\\pip.exe install -r requirements.txt', { stdio: 'inherit' });
+} else {
+    console.error('Error: Virtual environment (.venv) not found.');
+    process.exit(1);
+}

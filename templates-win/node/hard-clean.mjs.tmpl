@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+import { execSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
+
+console.log('Nuking node_modules and resetting package locks...');
+rmSync('node_modules', { recursive: true, force: true });
+rmSync('package-lock.json', { force: true });
+rmSync('yarn.lock', { force: true });
+execSync('npm install', { stdio: 'inherit' });

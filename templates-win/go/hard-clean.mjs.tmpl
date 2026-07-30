@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { execSync } from 'node:child_process';
+console.log('Cleaning Go module cache...');
+execSync('go clean -modcache', { stdio: 'inherit' });

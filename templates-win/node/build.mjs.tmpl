@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { execSync } from 'node:child_process';
+console.log('Building Node project...');
+execSync('npm run build', { stdio: 'inherit' });

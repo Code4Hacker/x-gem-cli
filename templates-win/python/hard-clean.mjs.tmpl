@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+import { execSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
+
+console.log('Cleaning Python cache and rebuilding environment...');
+rmSync('__pycache__', { recursive: true, force: true });
+rmSync('.venv', { recursive: true, force: true });
+execSync('python -m venv .venv', { stdio: 'inherit' });

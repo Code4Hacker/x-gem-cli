@@ -27,7 +27,8 @@ xgem isn't in Homebrew's central `homebrew-core` (that requires a formal submiss
 npm install -g xgem-cli
 ```
 
-*(not yet published to the npm registry)*
+Works natively on Windows too (no WSL needed) — npm's install runs a small Node.js
+engine there instead of the bash one; see [Windows support](#windows-support).
 
 ### curl
 
@@ -105,6 +106,24 @@ force Flutter to regenerate the generated package.
    as a documented, loudly-logged last resort — never silently.
 
 Run `xgem doctor ios` any time for a standalone readiness report without doing a build.
+
+## Windows support
+
+Homebrew and the curl installer are macOS/Linux only, same as any bash tool — that's
+not going to change. npm is different: it's published with a small native Windows
+engine (`lib-win/`, driven by `bin/xgem.js`) so `npm install -g xgem-cli` actually works
+in `cmd.exe`/PowerShell, no WSL required.
+
+What works on Windows: `init`/`add`/`run`/`terminate`, `doctor`, the git workflow
+commands, and Flutter builds for **APK and Windows desktop** targets. What doesn't:
+Flutter **iOS/macOS** builds — Xcode has no Windows equivalent, so `xgem doctor ios`
+explains that plainly instead of pretending. `swift` isn't offered as a framework
+choice on Windows for the same reason. If you're inside WSL, none of this applies —
+WSL reports itself as Linux, so you get the full bash engine automatically.
+
+On macOS/Linux, npm installs run the exact same bash engine as Homebrew/curl (`bin/xgem.js`
+is a thin passthrough that execs the real `bin/xgem` script) — there's only one
+implementation to trust on POSIX; Windows is the only platform with a second one.
 
 ## Roadmap
 

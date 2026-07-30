@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+import { execSync } from 'node:child_process';
+execSync('go build -o bin\\main.exe main.go', { stdio: 'inherit' });

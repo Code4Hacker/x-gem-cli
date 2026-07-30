@@ -1,22 +1,23 @@
 {
   "name": "xgem-cli",
-  "version": "2.0.0-alpha.1",
-  "description": "Framework-aware automation CLI: scaffolds and runs clean/build/dev scripts per project type, an environment doctor, a SwiftPM-aware iOS build engine, and a git workflow helper.",
+  "version": "2.0.0-alpha.2",
+  "description": "Framework-aware automation CLI: scaffolds and runs clean/build/dev scripts per project type, an environment doctor, a SwiftPM-aware iOS build engine, and a git workflow helper. Runs natively on macOS, Linux, and Windows.",
   "bin": {
-    "xgem": "bin/xgem"
+    "xgem": "bin/xgem.js"
   },
   "files": [
     "bin/xgem",
+    "bin/xgem.js",
     "lib",
+    "lib-win",
     "templates",
-    "scripts/check-platform.js"
+    "templates-win"
   ],
   "engines": {
-    "node": ">=14"
+    "node": ">=18"
   },
   "scripts": {
-    "preinstall": "node scripts/check-platform.js",
-    "test": "bash -n bin/xgem && for f in lib/*.sh; do bash -n \"$f\"; done"
+    "test": "bash -n bin/xgem && for f in lib/*.sh; do bash -n \"$f\"; done && for f in bin/xgem.js lib-win/*.js; do node --check \"$f\"; done"
   },
   "keywords": [
     "cli",
