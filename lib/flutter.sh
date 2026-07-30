@@ -244,6 +244,7 @@ create_flutter_project() {
     require_cmd flutter "Install Flutter: https://docs.flutter.dev/get-started/install"
     local project_dir
     project_dir=$(_prompt_project_location "Flutter")
+    [ "$project_dir" != "." ] && XGEM_CREATED_NEW_FOLDER="$project_dir"
     if [ "$project_dir" = "." ]; then
         flutter create . || die "flutter create failed."
     else
@@ -326,6 +327,13 @@ _flutter_offer_launch_emulator() {
     sleep 5
 }
 
+# Only picks the device and records the launch command in
+# XGEM_POST_INIT_LAUNCH_CMD — does NOT run `flutter run` itself. That's a
+# long-running blocking process; running it here (before xgem's own
+# template injection / .gitignore setup) means a Ctrl-C on it would kill
+# this whole xgem process before that setup ever runs, same class of bug
+# as create-vite's own --immediate flag caused for React. Device selection
+# itself is just a quick menu prompt, so it's safe to do now.
 _flutter_offer_run_on_device() {
     local run_choice
     read -r -p "Run the app now on a device/simulator? (Y/n): " run_choice
@@ -335,7 +343,7 @@ _flutter_offer_run_on_device() {
     local device_id
     device_id=$(_flutter_select_device)
     if [ -n "$device_id" ]; then
-        flutter run -d "$device_id"
+        XGEM_POST_INIT_LAUNCH_CMD=(flutter run -d "$device_id")
     else
         log_warn "No device selected — run 'flutter run' manually once one is available."
     fi

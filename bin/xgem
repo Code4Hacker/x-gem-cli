@@ -112,6 +112,16 @@ case "${1:-}" in
         fi
 
         _ask_launch_dev_server
+
+        # A child process (this script) can never change the parent
+        # shell's cwd — xgem's own process correctly cd'd into the new
+        # project folder for everything above, but your actual terminal
+        # is still wherever it started. Say so explicitly instead of
+        # leaving you to discover it the confusing way.
+        if [ -n "$XGEM_CREATED_NEW_FOLDER" ]; then
+            echo ""
+            log_info "Your project is in ./$XGEM_CREATED_NEW_FOLDER — your terminal is still in the original directory. Run: cd $XGEM_CREATED_NEW_FOLDER"
+        fi
         exit 0
         ;;
 

@@ -16,6 +16,14 @@
 # handing the terminal over to a long-running dev server.
 XGEM_POST_INIT_LAUNCH_CMD=()
 
+# Set by creators when a NEW folder was created (not "current directory").
+# A child process can never change its parent shell's cwd, so once `xgem
+# init` exits, the user's actual terminal is back wherever it started —
+# xgem's own process is correctly cd'd into the new folder for the rest of
+# ITS run (template injection, dev server), but that never propagates back.
+# bin/xgem prints a "cd <name>" reminder using this at the very end.
+XGEM_CREATED_NEW_FOLDER=""
+
 # _prompt_project_location <human label> -> echoes "." or a new folder name.
 # Pure prompt-and-echo, no other stdout output, so it's safe to capture via
 # command substitution.
@@ -80,6 +88,19 @@ _launch_dev_server_and_open_browser() {
 
 _ask_launch_dev_server() {
     [ ${#XGEM_POST_INIT_LAUNCH_CMD[@]} -gt 0 ] || return 0
+
+    # `flutter run` isn't a web dev server — it has no localhost URL to
+    # detect/open, and it depends on a fully-inherited interactive stdin
+    # for its own hot-reload keybindings (r/R/q/etc.), which the
+    # background+log-tail approach below would break. Run it directly.
+    # (Whether to run at all was already confirmed in
+    # _flutter_offer_run_on_device before this command was ever set, so
+    # this doesn't ask again.)
+    if [ "${XGEM_POST_INIT_LAUNCH_CMD[0]}" = "flutter" ]; then
+        "${XGEM_POST_INIT_LAUNCH_CMD[@]}"
+        return 0
+    fi
+
     local answer
     read -r -p "Launch the dev server now and open it in your browser? (Y/n): " answer
     answer=${answer:-y}
@@ -93,6 +114,7 @@ _create_react() {
     read -r -p "TypeScript or JavaScript? [ts/js] (default: ts): " lang
     lang=${lang:-ts}
     project_dir=$(_prompt_project_location "React")
+    [ "$project_dir" != "." ] && XGEM_CREATED_NEW_FOLDER="$project_dir"
 
     if [[ "$variant" == cra* || "$variant" == CRA* ]]; then
         require_cmd npx "Install Node.js (npm ships with it): https://nodejs.org"
@@ -104,7 +126,12 @@ _create_react() {
         require_cmd npm "Install Node.js (npm ships with it): https://nodejs.org"
         local template="react"
         [ "$lang" = "ts" ] && template="react-ts"
-        npm create vite@latest "$project_dir" -- --template "$template" || die "npm create vite failed."
+        # --no-immediate: create-vite's own "install deps and start dev
+        # server" prompt would otherwise block here and, if Ctrl-C'd, kill
+        # this whole xgem process before it ever reaches template
+        # injection / .gitignore setup below. xgem handles install/launch
+        # itself instead, after everything else is done.
+        npm create vite@latest "$project_dir" -- --template "$template" --no-immediate || die "npm create vite failed."
     fi
 
     [ "$project_dir" != "." ] && { cd "$project_dir" || die "Could not enter $project_dir"; }
@@ -117,6 +144,7 @@ _create_vue() {
     require_cmd npm "Install Node.js (npm ships with it): https://nodejs.org"
     local project_dir
     project_dir=$(_prompt_project_location "Vue")
+    [ "$project_dir" != "." ] && XGEM_CREATED_NEW_FOLDER="$project_dir"
     npm create vue@latest "$project_dir" || die "npm create vue failed."
     [ "$project_dir" != "." ] && { cd "$project_dir" || die "Could not enter $project_dir"; }
     log_info "Installing dependencies..."
@@ -127,6 +155,7 @@ _create_vue() {
 _create_angular() {
     local project_dir
     project_dir=$(_prompt_project_location "Angular")
+    [ "$project_dir" != "." ] && XGEM_CREATED_NEW_FOLDER="$project_dir"
     local -a ng_cmd=(ng)
     has_cmd ng || ng_cmd=(npx @angular/cli@latest)
 
@@ -143,6 +172,7 @@ _create_next() {
     require_cmd npx "Install Node.js (npm ships with it): https://nodejs.org"
     local project_dir
     project_dir=$(_prompt_project_location "Next.js")
+    [ "$project_dir" != "." ] && XGEM_CREATED_NEW_FOLDER="$project_dir"
     npx create-next-app@latest "$project_dir" || die "create-next-app failed."
     [ "$project_dir" != "." ] && { cd "$project_dir" || die "Could not enter $project_dir"; }
     XGEM_POST_INIT_LAUNCH_CMD=(npm run dev)
@@ -154,6 +184,7 @@ _create_simple() {
     local fw=$1
     local project_dir
     project_dir=$(_prompt_project_location "$fw")
+    [ "$project_dir" != "." ] && XGEM_CREATED_NEW_FOLDER="$project_dir"
     [ "$project_dir" != "." ] && { mkdir -p "$project_dir" && cd "$project_dir" || die "Could not enter $project_dir"; }
 
     case "$fw" in
