@@ -46,6 +46,29 @@ cmd_git_cmt() {
         return 0
     fi
 
+    # A pull needs something to pull FROM. If this branch has never been
+    # pushed before, there's no remote ref to pull, and `git pull --rebase`
+    # fails with "couldn't find remote ref <branch>" — which is not a
+    # connection problem or a conflict, just a brand-new branch. Check for
+    # that specific case first so it gets its own accurate message instead
+    # of being lumped in with real connectivity failures.
+    git ls-remote --exit-code --heads "$remote_name" "$current_branch" >/dev/null 2>&1
+    local ls_remote_status=$?
+
+    if [ "$ls_remote_status" -eq 2 ]; then
+        log_info "'$current_branch' doesn't exist on '$remote_name' yet — pushing to create it..."
+        if git push -u "$remote_name" "$current_branch"; then
+            log_success "Git workflow complete! Branch created and pushed."
+        else
+            die "Push operation failed."
+        fi
+        return 0
+    elif [ "$ls_remote_status" -ne 0 ]; then
+        log_error "Could not reach '$remote_name' to check for '$current_branch' — this looks like a real connection problem."
+        log_warn "Your commit is safe locally. Re-run 'xgem git cmt' once connectivity is restored, or push manually: git push $remote_name $current_branch"
+        exit 1
+    fi
+
     local ahead_count
     ahead_count=$(git rev-list --count "$remote_name/$current_branch..$current_branch" 2>/dev/null)
     if [ "$ahead_count" = "0" ]; then
@@ -163,13 +186,69 @@ cmd_git_rm_branch() {
     fi
 }
 
-# xgem git <cmt|init|rm-remote|rm-branch> ...
+# cmd_git_branch: lists local branches, lets the user pick one (or create a
+# new one), checks it out, and remembers it as this repo's default so
+# there's a quick way back to it later. `xgem git cmt` always operates on
+# whatever's actually checked out (that's the only thing that's correct for
+# a commit), so this command's job is the checkout + remembering, not
+# changing how cmt picks its branch.
+cmd_git_branch() {
+    local -a branches=()
+    while IFS= read -r line; do
+        [ -n "$line" ] && branches+=("$line")
+    done < <(git branch --format='%(refname:short)' 2>/dev/null)
+
+    [ ${#branches[@]} -gt 0 ] || die "No local branches found."
+
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+
+    echo "Available branches:"
+    local i=1 b
+    for b in "${branches[@]}"; do
+        if [ "$b" = "$current_branch" ]; then
+            echo "$i) $b (current)"
+        else
+            echo "$i) $b"
+        fi
+        i=$((i + 1))
+    done
+    local create_option=$i
+    echo "$create_option) Create new branch"
+
+    local choice
+    read -r -p "Select [1-$create_option]: " choice
+
+    if [ "$choice" = "$create_option" ]; then
+        local new_branch
+        read -r -p "Enter new branch name: " new_branch
+        [ -n "$new_branch" ] || die "Branch name cannot be empty."
+        git checkout -b "$new_branch" || die "Could not create branch '$new_branch'."
+        git config --local xgem.default-branch "$new_branch"
+        log_success "Created and switched to '$new_branch', set as default for this repo."
+        return 0
+    fi
+
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt ${#branches[@]} ]; then
+        die "Invalid selection."
+    fi
+
+    local selected="${branches[$((choice - 1))]}"
+    if [ "$selected" != "$current_branch" ]; then
+        git checkout "$selected" || die "Could not switch to branch '$selected'."
+    fi
+    git config --local xgem.default-branch "$selected"
+    log_success "Switched to '$selected' and set as default for this repo."
+}
+
+# xgem git <cmt|init|rm-remote|rm-branch|branch> ...
 cmd_git() {
     case "$1" in
         cmt)       cmd_git_cmt "$2" ;;
         init)      cmd_git_init ;;
         rm-remote) cmd_git_rm_remote ;;
         rm-branch) cmd_git_rm_branch ;;
-        *) die "Unknown git subcommand '$1'. Usage: xgem git <cmt|init|rm-remote|rm-branch>" ;;
+        branch)    cmd_git_branch ;;
+        *) die "Unknown git subcommand '$1'. Usage: xgem git <cmt|init|rm-remote|rm-branch|branch>" ;;
     esac
 }

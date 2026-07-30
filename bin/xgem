@@ -70,6 +70,7 @@ print_usage() {
     echo "  xgem doctor [ios]             - Report on your environment / iOS SwiftPM build readiness"
     echo "  xgem git cmt \"message\"        - Auto-stage, commit, rebase-pull, and push"
     echo "  xgem git init                 - Setup local repo, attach remote tracker shortcuts"
+    echo "  xgem git branch               - Pick, create, or switch branches; remembers your choice"
     echo "  xgem git rm-remote            - Drop specified target remote tracing rules"
     echo "  xgem git rm-branch            - Safely drop local and remote workspace branch states"
     echo "  xgem --version                - Print xgem's version"
@@ -182,7 +183,7 @@ case "${1:-}" in
         ;;
 
     git)
-        [ -n "${2:-}" ] || die "Usage: xgem git <cmt|init|rm-remote|rm-branch>"
+        [ -n "${2:-}" ] || die "Usage: xgem git <cmt|init|branch|rm-remote|rm-branch>"
         cmd_git "$2" "${3:-}"
         exit 0
         ;;

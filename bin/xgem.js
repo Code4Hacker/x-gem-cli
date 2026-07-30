@@ -45,6 +45,7 @@ function printUsage() {
     console.log('  xgem doctor [ios]             - Report on your environment / iOS build availability');
     console.log('  xgem git cmt "message"        - Auto-stage, commit, rebase-pull, and push');
     console.log('  xgem git init                 - Setup local repo, attach remote tracker shortcuts');
+    console.log('  xgem git branch               - Pick, create, or switch branches; remembers your choice');
     console.log('  xgem git rm-remote            - Drop specified target remote tracing rules');
     console.log('  xgem git rm-branch            - Safely drop local and remote workspace branch states');
     console.log('  xgem --version                - Print xgem\'s version');
@@ -187,7 +188,7 @@ async function main() {
         case 'run': return cmdRun(a2, a3);
         case 'terminate': return cmdTerminate();
         case 'git':
-            if (!a2) die('Usage: xgem git <cmt|init|rm-remote|rm-branch>');
+            if (!a2) die('Usage: xgem git <cmt|init|branch|rm-remote|rm-branch>');
             return cmdGit(a2, a3);
         case 'doctor': return cmdDoctor(a2);
         case '--version':

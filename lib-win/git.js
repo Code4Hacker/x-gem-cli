@@ -60,6 +60,26 @@ async function cmdCmt(commitMsg) {
         return;
     }
 
+    // A pull needs something to pull FROM. If this branch has never been
+    // pushed before, there's no remote ref, and `git pull --rebase` fails
+    // with "couldn't find remote ref <branch>" — not a connection problem
+    // or a conflict, just a brand-new branch. Check for that case first.
+    const lsRemoteStatus = spawnSync('git', ['ls-remote', '--exit-code', '--heads', remoteName, currentBranch]).status;
+
+    if (lsRemoteStatus === 2) {
+        logInfo(`'${currentBranch}' doesn't exist on '${remoteName}' yet — pushing to create it...`);
+        if (git(['push', '-u', remoteName, currentBranch]).status === 0) {
+            logSuccess('Git workflow complete! Branch created and pushed.');
+        } else {
+            die('Push operation failed.');
+        }
+        return;
+    } else if (lsRemoteStatus !== 0) {
+        logError(`Could not reach '${remoteName}' to check for '${currentBranch}' — this looks like a real connection problem.`);
+        logWarn(`Your commit is safe locally. Re-run 'xgem git cmt' once connectivity is restored, or push manually: git push ${remoteName} ${currentBranch}`);
+        process.exit(1);
+    }
+
     const aheadCount = gitCapture(['rev-list', '--count', `${remoteName}/${currentBranch}..${currentBranch}`]);
     if (aheadCount === '0') {
         logSuccess(`Already up to date with '${remoteName}/${currentBranch}' — nothing to push.`);
@@ -168,13 +188,53 @@ async function cmdRmBranch() {
     }
 }
 
+// Lists local branches, lets the user pick one (or create a new one),
+// checks it out, and remembers it as this repo's default. cmt always
+// operates on whatever's actually checked out — this command's job is the
+// checkout + remembering, not changing how cmt picks its branch.
+async function cmdBranch() {
+    const branches = gitCapture(['branch', '--format=%(refname:short)']).split(/\r?\n/).filter(Boolean);
+    if (branches.length === 0) die('No local branches found.');
+
+    const currentBranch = gitCapture(['branch', '--show-current']);
+
+    console.log('Available branches:');
+    branches.forEach((b, i) => {
+        console.log(`${i + 1}) ${b}${b === currentBranch ? ' (current)' : ''}`);
+    });
+    const createOption = branches.length + 1;
+    console.log(`${createOption}) Create new branch`);
+
+    const choice = await prompt(`Select [1-${createOption}]`);
+
+    if (choice === String(createOption)) {
+        const newBranch = await prompt('Enter new branch name');
+        if (!newBranch) die('Branch name cannot be empty.');
+        if (git(['checkout', '-b', newBranch]).status !== 0) die(`Could not create branch '${newBranch}'.`);
+        git(['config', '--local', 'xgem.default-branch', newBranch]);
+        logSuccess(`Created and switched to '${newBranch}', set as default for this repo.`);
+        return;
+    }
+
+    const idx = parseInt(choice, 10) - 1;
+    if (Number.isNaN(idx) || idx < 0 || idx >= branches.length) die('Invalid selection.');
+
+    const selected = branches[idx];
+    if (selected !== currentBranch) {
+        if (git(['checkout', selected]).status !== 0) die(`Could not switch to branch '${selected}'.`);
+    }
+    git(['config', '--local', 'xgem.default-branch', selected]);
+    logSuccess(`Switched to '${selected}' and set as default for this repo.`);
+}
+
 async function cmdGit(sub, arg) {
     switch (sub) {
         case 'cmt': return cmdCmt(arg);
         case 'init': return cmdInit();
+        case 'branch': return cmdBranch();
         case 'rm-remote': return cmdRmRemote();
         case 'rm-branch': return cmdRmBranch();
-        default: die(`Unknown git subcommand '${sub}'. Usage: xgem git <cmt|init|rm-remote|rm-branch>`);
+        default: die(`Unknown git subcommand '${sub}'. Usage: xgem git <cmt|init|branch|rm-remote|rm-branch>`);
     }
 }
 

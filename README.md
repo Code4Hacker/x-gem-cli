@@ -49,6 +49,7 @@ xgem doctor ios [path]        Report on iOS build readiness: CocoaPods vs SPM, d
                                targets per config, and whether they're reconciled
 xgem git cmt "message"        Auto-stage, commit, rebase-pull, and push
 xgem git init                 Setup local repo, attach remote tracker shortcuts
+xgem git branch               Pick, create, or switch branches; remembers your choice
 xgem git rm-remote            Drop a configured remote
 xgem git rm-branch            Safely drop local and/or remote branch
 xgem --version                Print xgem's version
@@ -70,7 +71,7 @@ lib/
   doctor.sh    environment + feature detection ("xgem doctor")
   ios.sh       the SwiftPM-aware iOS build engine
   flutter.sh   flutter command group (build/hard-clean/build-runner), delegates iOS builds to ios.sh
-  git.sh       git cmt/init/rm-remote/rm-branch
+  git.sh       git cmt/init/branch/rm-remote/rm-branch
   scaffold.sh  generic clean/build/dev handling for the other, simpler frameworks
 templates/     the actual clean/build/dev script content xgem scaffolds into your project's .xgem-automate/
 ```
