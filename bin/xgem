@@ -91,25 +91,17 @@ case "${1:-}" in
         PS3="Enter target selection number: "
         select fw in "${ALL_FRAMEWORKS[@]}"; do
             if [ -n "$fw" ]; then
+                # create_project_wizard handles ALL of xgem's own
+                # bookkeeping (.xgem-automate + .gitignore) internally now,
+                # at the earliest safe point for each framework — never
+                # after a slow/interruptible step, so a Ctrl-C during (say)
+                # `ng new`'s install can no longer lose it. See lib/create.sh.
                 create_project_wizard "$fw"
-                mkdir -p "$CONFIG_DIR"
-                scaffold_inject_templates "$fw" "$CONFIG_DIR"
-                log_success "Successfully appended standard scripts for: $CONFIG_DIR/$fw"
                 break
             else
                 echo "Invalid selection."
             fi
         done
-
-        if [ -f .gitignore ]; then
-            if ! grep -q "$CONFIG_DIR/" .gitignore; then
-                echo -e "\n$CONFIG_DIR/" >> .gitignore
-                log_success "Added automation tracking to .gitignore"
-            fi
-        else
-            echo "$CONFIG_DIR/" > .gitignore
-            log_success "Created .gitignore and hidden tracking layer folder references."
-        fi
 
         _ask_launch_dev_server
 

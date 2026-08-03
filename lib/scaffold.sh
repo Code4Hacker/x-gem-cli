@@ -13,12 +13,31 @@
 
 ALL_FRAMEWORKS=(flutter node python react vue angular next go rust docker swift)
 
+# _package_json_has_script <script> — checks the CURRENT directory's
+# package.json, not a guess. Used to only offer lint/test automation when
+# the project actually has those scripts, instead of always generating
+# scripts that fail with "Missing script" on projects that don't.
+_package_json_has_script() {
+    [ -f package.json ] || return 1
+    grep -qE "\"$1\"[[:space:]]*:" package.json 2>/dev/null
+}
+
 framework_scripts() {
     case "$1" in
         flutter) echo "hard-clean build build-runner" ;;
-        node)    echo "hard-clean build start" ;;
+        node)
+            local scripts="hard-clean build start"
+            _package_json_has_script lint && scripts="$scripts lint"
+            _package_json_has_script test && scripts="$scripts test"
+            echo "$scripts"
+            ;;
         python)  echo "hard-clean install" ;;
-        react|vue|angular|next) echo "hard-clean build dev" ;;
+        react|vue|angular|next)
+            local scripts="hard-clean build dev"
+            _package_json_has_script lint && scripts="$scripts lint"
+            _package_json_has_script test && scripts="$scripts test"
+            echo "$scripts"
+            ;;
         go)      echo "hard-clean build" ;;
         rust)    echo "hard-clean build" ;;
         docker)  echo "hard-clean build-up" ;;

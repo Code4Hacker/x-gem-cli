@@ -1,2 +1,10 @@
 #!/bin/bash
-npm run dev
+if [ -f pnpm-lock.yaml ]; then
+    pnpm run dev
+elif [ -f yarn.lock ]; then
+    yarn dev
+elif [ -f bun.lockb ] || [ -f bun.lock ]; then
+    bun run dev
+else
+    npm run dev
+fi

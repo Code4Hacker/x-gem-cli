@@ -1,3 +1,36 @@
 #!/bin/bash
-echo -e "\033[1;33mResetting __FRAMEWORK__ dependencies...\033[0m"
-rm -rf node_modules package-lock.json yarn.lock && npm install
+# Detect the package manager actually in use instead of assuming npm —
+# blindly deleting yarn.lock/pnpm-lock.yaml on a project that uses them
+# and running `npm install` instead corrupts the project by introducing a
+# conflicting lockfile.
+PKG_MANAGER=npm
+if [ -f pnpm-lock.yaml ]; then
+    PKG_MANAGER=pnpm
+elif [ -f yarn.lock ]; then
+    PKG_MANAGER=yarn
+elif [ -f bun.lockb ] || [ -f bun.lock ]; then
+    PKG_MANAGER=bun
+elif [ -f package.json ]; then
+    declared=$(grep -o '"packageManager"[[:space:]]*:[[:space:]]*"[a-z]*' package.json 2>/dev/null | grep -oE '[a-z]+$')
+    case "$declared" in npm|yarn|pnpm|bun) PKG_MANAGER=$declared ;; esac
+fi
+
+# Warn (don't block) on a Node version mismatch against .nvmrc, if present.
+if [ -f .nvmrc ] && command -v node >/dev/null 2>&1; then
+    wanted=$(tr -d 'v[:space:]' < .nvmrc)
+    have=$(node -v | tr -d 'v')
+    case "$have" in
+        "$wanted"*) ;;
+        *) echo -e "\033[33mWarning: .nvmrc wants Node $wanted, but 'node -v' reports $have.\033[0m" ;;
+    esac
+fi
+
+echo -e "\033[1;33mResetting __FRAMEWORK__ dependencies (package manager: $PKG_MANAGER)...\033[0m"
+rm -rf node_modules
+
+case "$PKG_MANAGER" in
+    yarn) rm -f yarn.lock; yarn install ;;
+    pnpm) rm -f pnpm-lock.yaml; pnpm install ;;
+    bun)  rm -f bun.lockb bun.lock; bun install ;;
+    *)    rm -f package-lock.json; npm install ;;
+esac

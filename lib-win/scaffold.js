@@ -22,8 +22,30 @@ const FRAMEWORK_SCRIPTS = {
     docker: ['hard-clean', 'build-up'],
 };
 
+const WEB_FRAMEWORKS = ['node', 'react', 'vue', 'angular', 'next'];
+
+// Only offer lint/test automation when the current directory's
+// package.json actually declares those scripts, instead of always
+// generating scripts that fail with "Missing script" on projects that
+// don't have them.
+function packageJsonHasScript(scriptName) {
+    try {
+        const pkg = JSON.parse(require('node:fs').readFileSync('package.json', 'utf8'));
+        return Boolean(pkg.scripts && pkg.scripts[scriptName]);
+    } catch {
+        return false;
+    }
+}
+
 function frameworkScripts(fw) {
-    return FRAMEWORK_SCRIPTS[fw] || null;
+    const base = FRAMEWORK_SCRIPTS[fw];
+    if (!base) return null;
+    if (!WEB_FRAMEWORKS.includes(fw)) return base;
+
+    const scripts = [...base];
+    if (packageJsonHasScript('lint')) scripts.push('lint');
+    if (packageJsonHasScript('test')) scripts.push('test');
+    return scripts;
 }
 
 function templateDir(fw) {

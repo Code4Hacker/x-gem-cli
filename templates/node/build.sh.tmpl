@@ -1,3 +1,11 @@
 #!/bin/bash
 echo -e "\033[1;34mBuilding Node project...\033[0m"
-npm run build
+if [ -f pnpm-lock.yaml ]; then
+    pnpm run build
+elif [ -f yarn.lock ]; then
+    yarn build
+elif [ -f bun.lockb ] || [ -f bun.lock ]; then
+    bun run build
+else
+    npm run build
+fi

@@ -102,31 +102,67 @@ cmd_git_cmt() {
     fi
 }
 
+_cmd_git_init_manual_remote() {
+    local remote_name=$1
+    local remote_url user_remote_name
+    read -r -p "Enter remote repository URL (or leave blank to skip): " remote_url
+    [ -n "$remote_url" ] || return 0
+
+    read -r -p "Enter remote name (default: $remote_name): " user_remote_name
+    [ -n "$user_remote_name" ] && remote_name="$user_remote_name"
+
+    if git remote | grep -q "^$remote_name$"; then
+        git remote set-url "$remote_name" "$remote_url"
+        log_success "Remote '$remote_name' already existed. URL updated."
+    else
+        git remote add "$remote_name" "$remote_url"
+        log_success "Remote '$remote_name' successfully added."
+    fi
+}
+
 cmd_git_init() {
     log_info "Initializing local Git repository..."
     git init
 
-    local remote_name="origin" remote_url user_remote_name branch_name
-    read -r -p "Enter remote repository URL: " remote_url
-    if [ -n "$remote_url" ]; then
-        read -r -p "Enter remote name (default: origin): " user_remote_name
-        [ -n "$user_remote_name" ] && remote_name="$user_remote_name"
-
-        if git remote | grep -q "^$remote_name$"; then
-            git remote set-url "$remote_name" "$remote_url"
-            log_success "Remote '$remote_name' already existed. URL updated."
-        else
-            git remote add "$remote_name" "$remote_url"
-            log_success "Remote '$remote_name' successfully added."
-        fi
-    fi
-
+    local branch_name
     read -r -p "Enter branch name (default: main): " branch_name
     branch_name=${branch_name:-main}
     git branch -M "$branch_name"
 
     git add .
     git commit -m "initial changes" 2>/dev/null
+
+    # Real GitHub repo creation, not just wiring a remote to a URL you
+    # already had to go create by hand — this is the whole point of
+    # `xgem git init` over plain `git init`. Falls back to the manual-URL
+    # flow if `gh` isn't installed/authenticated.
+    if has_cmd gh && gh auth status >/dev/null 2>&1; then
+        local create_choice
+        read -r -p "Create a new GitHub repository for this project right now? (Y/n): " create_choice
+        create_choice=${create_choice:-y}
+        if [[ "$create_choice" == "y" || "$create_choice" == "Y" ]]; then
+            local repo_name visibility vis_flag
+            read -r -p "Repository name (default: $(basename "$PWD")): " repo_name
+            repo_name=${repo_name:-$(basename "$PWD")}
+            read -r -p "Public or private? [public/private] (default: private): " visibility
+            visibility=${visibility:-private}
+            vis_flag="--private"
+            [[ "$visibility" == pub* || "$visibility" == Pub* ]] && vis_flag="--public"
+
+            if gh repo create "$repo_name" "$vis_flag" --source=. --remote=origin --push; then
+                log_success "Created GitHub repo '$repo_name' and pushed '$branch_name' to it."
+            else
+                log_error "gh repo create failed — falling back to manual remote setup."
+                _cmd_git_init_manual_remote origin
+            fi
+            log_success "Local baseline configuration setup completed."
+            return 0
+        fi
+    elif has_cmd gh; then
+        log_warn "GitHub CLI (gh) is installed but not authenticated — run 'gh auth login' to enable one-step repo creation next time."
+    fi
+
+    _cmd_git_init_manual_remote origin
     log_success "Local baseline configuration setup completed."
 }
 

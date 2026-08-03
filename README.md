@@ -13,7 +13,11 @@ your environment, and `xgem git` wraps a common stage → commit → rebase-pull
 Flutter's iOS builds go through a dedicated engine that detects whether your
 project uses CocoaPods or Swift Package Manager (SPM), figures out the actual
 deployment target your resolved SPM plugins require (instead of guessing),
-and reconciles it automatically — see [Why the iOS build engine exists](#why-the-ios-build-engine-exists).
+and reconciles it automatically.
+
+**Full documentation: [docs/](docs/README.md)** — getting started, every command in
+depth, exactly what each framework's project-creation wizard does, the iOS build
+engine explained, Windows support, and troubleshooting. This README is a summary.
 
 ## Install
 
@@ -68,31 +72,13 @@ flutter, node, python, react, vue, angular, next, go, rust, docker, swift
 ## Creating a new project
 
 `xgem init` asks, per framework, whether to create a brand-new project or use
-what's already in the directory:
-
-- **react**: Vite or Create React App ("the normal version"), then TypeScript
-  or JavaScript, then current directory or a new folder.
-- **vue** / **next**: runs the official `create-vue`/`create-next-app` wizard
-  directly, so you get their own real prompts (router, Tailwind, App Router,
-  etc.) rather than a re-implementation of them.
-- **angular**: `ng new` (via a local Angular CLI if you have one, `npx
-  @angular/cli` otherwise).
-- **flutter**: `flutter create`, then lists available devices/simulators
-  (falling back to available-but-not-booted emulators you can launch) and
-  runs on whichever you pick.
-- **node/python/go/rust/docker/swift**: the ecosystem's own minimal init
-  command (`npm init`, a `.venv`, `cargo new`, `go mod init`, a starter
-  Dockerfile, `swift package init`) — no sub-wizard, since these don't have
-  an equivalent "dev server" to launch.
-
-For the frameworks with a dev server (react/vue/angular/next), after
-dependencies install xgem offers to start it and open your default browser —
-it tails the server's own log for the first `http://localhost:PORT` it
-prints rather than guessing a framework's default port, so it works even if
-that port's already taken and a different one gets picked.
-
-Answering "existing" (the default) skips all of this and behaves exactly
-like before — just scaffolds `.xgem-automate/` into the current directory.
+what's already in the directory — real `create-vite`/`create-vue`/`ng new`/
+`create-next-app`/`flutter create` scaffolding, with framework-specific
+questions and a working dev-server/device launch at the end. Package manager
+(npm/yarn/pnpm/bun) is auto-detected everywhere, never assumed. Answering
+"existing" (the default) skips all of this and just scaffolds
+`.xgem-automate/` into the current directory. Full detail, including exactly
+what runs for each framework: **[docs/frameworks.md](docs/frameworks.md)**.
 
 ## Architecture
 
@@ -118,47 +104,25 @@ of logic that can drift out of sync with two copies.
 ## Why the iOS build engine exists
 
 Flutter auto-generates a wrapper Swift package, `FlutterGeneratedPluginSwiftPackage`,
-that aggregates your plugins' SPM dependencies. Its declared minimum iOS platform can
-desync from your app's own `IPHONEOS_DEPLOYMENT_TARGET` — a confirmed, currently-open
-upstream Flutter bug ([flutter/flutter#186804](https://github.com/flutter/flutter/issues/186804),
+whose declared minimum iOS platform can desync from your app's own
+`IPHONEOS_DEPLOYMENT_TARGET` — independently, even when your app's own target is
+already high enough. This is a confirmed, currently-open upstream Flutter bug
+([flutter/flutter#186804](https://github.com/flutter/flutter/issues/186804),
 [#189422](https://github.com/flutter/flutter/issues/189422),
-[#162072](https://github.com/flutter/flutter/issues/162072)). A single `sed` patch to
-`project.pbxproj` doesn't reliably fix this: there are multiple deployment-target entries
-across Debug/Release/Profile × Runner/RunnerTests, and even a fully correct patch doesn't
-force Flutter to regenerate the generated package.
-
-`xgem run flutter build` (for the iOS target) instead:
-
-1. Detects whether the project uses CocoaPods, SPM, or both.
-2. Computes the deployment target actually required by your *resolved* SPM plugins
-   (by reading their `ios/Package.swift` manifests via `.dart_tool/package_config.json`),
-   instead of assuming a fixed value.
-3. Shows a plan and asks for confirmation (unless `--yes`/`--dry-run`) before patching
-   *every* `IPHONEOS_DEPLOYMENT_TARGET` occurrence in `project.pbxproj`.
-4. Forces a clean regeneration (`flutter pub get` after clearing `ios/Flutter/ephemeral`)
-   and verifies the regenerated package matches.
-5. If it still doesn't (the upstream bug above), patches the generated package directly
-   as a documented, loudly-logged last resort — never silently.
-
-Run `xgem doctor ios` any time for a standalone readiness report without doing a build.
+[#162072](https://github.com/flutter/flutter/issues/162072)). `xgem run flutter build`
+(iOS target) detects the actual requirement from your resolved SPM plugins, patches
+every deployment-target occurrence, forces a clean regeneration, verifies it, and
+falls back to a documented direct patch if the upstream bug is still biting — full
+detail: **[docs/ios-build-engine.md](docs/ios-build-engine.md)**. Run `xgem doctor ios`
+any time for a standalone readiness report without doing a build.
 
 ## Windows support
 
-Homebrew and the curl installer are macOS/Linux only, same as any bash tool — that's
-not going to change. npm is different: it's published with a small native Windows
-engine (`lib-win/`, driven by `bin/xgem.js`) so `npm install -g xgem-cli` actually works
-in `cmd.exe`/PowerShell, no WSL required.
-
-What works on Windows: `init`/`add`/`run`/`terminate`, `doctor`, the git workflow
-commands, and Flutter builds for **APK, App Bundle, and Windows desktop** targets. What doesn't:
-Flutter **iOS/macOS** builds — Xcode has no Windows equivalent, so `xgem doctor ios`
-explains that plainly instead of pretending. `swift` isn't offered as a framework
-choice on Windows for the same reason. If you're inside WSL, none of this applies —
-WSL reports itself as Linux, so you get the full bash engine automatically.
-
-On macOS/Linux, npm installs run the exact same bash engine as Homebrew/curl (`bin/xgem.js`
-is a thin passthrough that execs the real `bin/xgem` script) — there's only one
-implementation to trust on POSIX; Windows is the only platform with a second one.
+Homebrew and the curl installer are macOS/Linux only, same as any bash tool. npm is
+different: it ships a small native Windows engine (`lib-win/`) so `npm install -g
+xgem-cli` actually works in `cmd.exe`/PowerShell, no WSL required — everything except
+Flutter iOS/macOS builds (Xcode has no Windows equivalent) and the project-creation
+wizards (not ported yet). Full detail: **[docs/windows.md](docs/windows.md)**.
 
 ## Roadmap
 

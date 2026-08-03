@@ -1,9 +1,28 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync, readFileSync } from 'node:fs';
 
-console.log('Nuking node_modules and resetting package locks...');
+function detectPkgManager() {
+    if (existsSync('pnpm-lock.yaml')) return 'pnpm';
+    if (existsSync('yarn.lock')) return 'yarn';
+    if (existsSync('bun.lockb') || existsSync('bun.lock')) return 'bun';
+    if (existsSync('package.json')) {
+        try {
+            const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+            if (['npm', 'yarn', 'pnpm', 'bun'].includes(pkg.packageManager?.split('@')[0])) {
+                return pkg.packageManager.split('@')[0];
+            }
+        } catch { /* ignore malformed package.json */ }
+    }
+    return 'npm';
+}
+
+const pm = detectPkgManager();
+console.log(`Nuking node_modules and resetting package locks (package manager: ${pm})...`);
 rmSync('node_modules', { recursive: true, force: true });
-rmSync('package-lock.json', { force: true });
-rmSync('yarn.lock', { force: true });
-execSync('npm install', { stdio: 'inherit' });
+
+const lockfiles = { npm: ['package-lock.json'], yarn: ['yarn.lock'], pnpm: ['pnpm-lock.yaml'], bun: ['bun.lockb', 'bun.lock'] };
+for (const f of lockfiles[pm]) rmSync(f, { force: true });
+
+const installCmd = { npm: 'npm install', yarn: 'yarn', pnpm: 'pnpm install', bun: 'bun install' };
+execSync(installCmd[pm], { stdio: 'inherit' });

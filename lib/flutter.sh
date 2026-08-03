@@ -239,18 +239,20 @@ flutter_run_native_command() {
 }
 
 # create_flutter_project — used by lib/create.sh's create_project_wizard.
-# `flutter create` needs a target dir; "." scaffolds into the current one.
+# --no-pub decouples scaffolding from the (slower, network-dependent)
+# `flutter pub get` step, so xgem's own bookkeeping (_xgem_bookkeeping) can
+# happen in between — same ordering principle as the other creators in
+# lib/create.sh: bookkeeping before any slow/interruptible step, never after.
 create_flutter_project() {
     require_cmd flutter "Install Flutter: https://docs.flutter.dev/get-started/install"
     local project_dir
     project_dir=$(_prompt_project_location "Flutter")
-    [ "$project_dir" != "." ] && XGEM_CREATED_NEW_FOLDER="$project_dir"
-    if [ "$project_dir" = "." ]; then
-        flutter create . || die "flutter create failed."
-    else
-        flutter create "$project_dir" || die "flutter create failed."
-        cd "$project_dir" || die "Could not enter $project_dir"
-    fi
+    _enter_project_dir "$project_dir"
+
+    flutter create --no-pub . || die "flutter create failed."
+    _xgem_bookkeeping flutter
+    log_info "Resolving packages..."
+    flutter pub get
     _flutter_offer_run_on_device
 }
 

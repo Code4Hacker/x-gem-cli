@@ -1,10 +1,10 @@
 #!/bin/bash
 if [ -f pnpm-lock.yaml ]; then
-    pnpm run start
+    pnpm run lint
 elif [ -f yarn.lock ]; then
-    yarn start
+    yarn lint
 elif [ -f bun.lockb ] || [ -f bun.lock ]; then
-    bun run start
+    bun run lint
 else
-    npm run start
+    npm run lint
 fi

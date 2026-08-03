@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
+let cmd = 'npm run lint';
+if (existsSync('pnpm-lock.yaml')) cmd = 'pnpm run lint';
+else if (existsSync('yarn.lock')) cmd = 'yarn lint';
+else if (existsSync('bun.lockb') || existsSync('bun.lock')) cmd = 'bun run lint';
+
+execSync(cmd, { stdio: 'inherit' });

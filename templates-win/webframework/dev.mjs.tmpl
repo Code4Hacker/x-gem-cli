@@ -1,3 +1,10 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-execSync('npm run dev', { stdio: 'inherit' });
+import { existsSync } from 'node:fs';
+
+let cmd = 'npm run dev';
+if (existsSync('pnpm-lock.yaml')) cmd = 'pnpm run dev';
+else if (existsSync('yarn.lock')) cmd = 'yarn dev';
+else if (existsSync('bun.lockb') || existsSync('bun.lock')) cmd = 'bun run dev';
+
+execSync(cmd, { stdio: 'inherit' });

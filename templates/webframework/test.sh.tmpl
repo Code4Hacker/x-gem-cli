@@ -1,10 +1,10 @@
 #!/bin/bash
 if [ -f pnpm-lock.yaml ]; then
-    pnpm run start
+    pnpm run test
 elif [ -f yarn.lock ]; then
-    yarn start
+    yarn test
 elif [ -f bun.lockb ] || [ -f bun.lock ]; then
-    bun run start
+    bun run test
 else
-    npm run start
+    npm run test
 fi

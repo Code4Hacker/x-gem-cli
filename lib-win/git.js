@@ -3,12 +3,21 @@
 // commit-exit-code check and origin-preference fix already in lib/git.sh
 // carry over here too.
 
+const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { logInfo, logSuccess, logWarn, logError, die } = require('./logger');
-const { prompt } = require('./utils');
+const { prompt, hasCmd } = require('./utils');
 
 function git(args, opts = {}) {
     return spawnSync('git', args, { stdio: 'inherit', ...opts });
+}
+
+function gh(args, opts = {}) {
+    return spawnSync('gh', args, { stdio: 'inherit', ...opts });
+}
+
+function ghAuthenticated() {
+    return spawnSync('gh', ['auth', 'status'], { stdio: 'ignore' }).status === 0;
 }
 
 function gitCapture(args) {
@@ -90,7 +99,6 @@ async function cmdCmt(commitMsg) {
     const pullResult = git(['pull', '--rebase', remoteName, currentBranch]);
     if (pullResult.status !== 0) {
         const gitDir = gitCapture(['rev-parse', '--git-dir']);
-        const path = require('node:path');
         const fs = require('node:fs');
         const inConflict = fs.existsSync(path.join(gitDir, 'rebase-merge')) || fs.existsSync(path.join(gitDir, 'rebase-apply'));
         if (inConflict) {
@@ -112,30 +120,60 @@ async function cmdCmt(commitMsg) {
     }
 }
 
+async function manualRemoteSetup(defaultRemoteName) {
+    let remoteName = defaultRemoteName;
+    const remoteUrl = await prompt('Enter remote repository URL (or leave blank to skip)');
+    if (!remoteUrl) return;
+
+    const userRemoteName = await prompt(`Enter remote name (default: ${remoteName})`);
+    if (userRemoteName) remoteName = userRemoteName;
+
+    if (remoteExists(remoteName)) {
+        git(['remote', 'set-url', remoteName, remoteUrl]);
+        logSuccess(`Remote '${remoteName}' already existed. URL updated.`);
+    } else {
+        git(['remote', 'add', remoteName, remoteUrl]);
+        logSuccess(`Remote '${remoteName}' successfully added.`);
+    }
+}
+
 async function cmdInit() {
     logInfo('Initializing local Git repository...');
     git(['init']);
-
-    let remoteName = 'origin';
-    const remoteUrl = await prompt('Enter remote repository URL');
-    if (remoteUrl) {
-        const userRemoteName = await prompt('Enter remote name (default: origin)');
-        if (userRemoteName) remoteName = userRemoteName;
-
-        if (remoteExists(remoteName)) {
-            git(['remote', 'set-url', remoteName, remoteUrl]);
-            logSuccess(`Remote '${remoteName}' already existed. URL updated.`);
-        } else {
-            git(['remote', 'add', remoteName, remoteUrl]);
-            logSuccess(`Remote '${remoteName}' successfully added.`);
-        }
-    }
 
     const branchName = (await prompt('Enter branch name (default: main)')) || 'main';
     git(['branch', '-M', branchName]);
 
     git(['add', '.']);
     git(['commit', '-m', 'initial changes']);
+
+    // Real GitHub repo creation, not just wiring a remote to a URL you
+    // already had to go create by hand — the whole point of `xgem git
+    // init` over plain `git init`. Falls back to the manual-URL flow if
+    // `gh` isn't installed/authenticated.
+    if (hasCmd('gh') && ghAuthenticated()) {
+        const createChoice = (await prompt('Create a new GitHub repository for this project right now? (Y/n)')) || 'y';
+        if (createChoice.toLowerCase() === 'y') {
+            const cwdName = path.basename(process.cwd());
+            const repoName = (await prompt(`Repository name (default: ${cwdName})`)) || cwdName;
+            const visibility = ((await prompt('Public or private? [public/private] (default: private)')) || 'private').toLowerCase();
+            const visFlag = visibility.startsWith('pub') ? '--public' : '--private';
+
+            const result = gh(['repo', 'create', repoName, visFlag, '--source=.', '--remote=origin', '--push']);
+            if (result.status === 0) {
+                logSuccess(`Created GitHub repo '${repoName}' and pushed '${branchName}' to it.`);
+            } else {
+                logError('gh repo create failed — falling back to manual remote setup.');
+                await manualRemoteSetup('origin');
+            }
+            logSuccess('Local baseline configuration setup completed.');
+            return;
+        }
+    } else if (hasCmd('gh')) {
+        logWarn("GitHub CLI (gh) is installed but not authenticated — run 'gh auth login' to enable one-step repo creation next time.");
+    }
+
+    await manualRemoteSetup('origin');
     logSuccess('Local baseline configuration setup completed.');
 }
 
