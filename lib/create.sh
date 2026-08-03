@@ -45,8 +45,23 @@ _xgem_bookkeeping() {
     scaffold_inject_templates "$fw" "$CONFIG_DIR"
     log_success "Successfully appended standard scripts for: $CONFIG_DIR/$fw"
 
-    if [ -f .gitignore ]; then
-        if ! grep -q "$CONFIG_DIR/" .gitignore; then
+    # Some teams want the generated scripts checked in so collaborators get
+    # the same automation; others want them private/local-only. Ask instead
+    # of always gitignoring.
+    local ignore_choice
+    read -r -p "Should $CONFIG_DIR/ be ignored by git (private to you), or tracked so collaborators get the same scripts? [ignore/track] (default: ignore): " ignore_choice
+    ignore_choice=${ignore_choice:-ignore}
+
+    if [[ "$ignore_choice" == t* || "$ignore_choice" == T* ]]; then
+        if [ -f .gitignore ] && grep -qx "$CONFIG_DIR/" .gitignore; then
+            local tmp
+            tmp=$(mktemp)
+            grep -vx "$CONFIG_DIR/" .gitignore > "$tmp" && mv "$tmp" .gitignore
+            log_info "Removed existing $CONFIG_DIR/ entry from .gitignore since you chose to track it."
+        fi
+        log_success "$CONFIG_DIR/ will be tracked in git."
+    elif [ -f .gitignore ]; then
+        if ! grep -qx "$CONFIG_DIR/" .gitignore; then
             echo -e "\n$CONFIG_DIR/" >> .gitignore
             log_success "Added automation tracking to .gitignore"
         fi

@@ -61,8 +61,23 @@ async function selectFramework(options) {
     return options[idx];
 }
 
-function updateGitignore() {
+// Some teams want the generated scripts checked in so collaborators get the
+// same automation; others want them private/local-only. Ask instead of
+// always gitignoring.
+async function updateGitignore() {
     const gitignorePath = '.gitignore';
+    const ignoreChoice = ((await prompt(`Should ${CONFIG_DIR}/ be ignored by git (private to you), or tracked so collaborators get the same scripts? [ignore/track]`, 'ignore'))).toLowerCase();
+
+    if (ignoreChoice.startsWith('t')) {
+        if (fs.existsSync(gitignorePath)) {
+            const lines = fs.readFileSync(gitignorePath, 'utf8').split(/\r?\n/).filter((l) => l !== `${CONFIG_DIR}/`);
+            fs.writeFileSync(gitignorePath, lines.join('\n'));
+            logInfo(`Removed existing ${CONFIG_DIR}/ entry from .gitignore since you chose to track it.`);
+        }
+        logSuccess(`${CONFIG_DIR}/ will be tracked in git.`);
+        return;
+    }
+
     if (fs.existsSync(gitignorePath)) {
         const content = fs.readFileSync(gitignorePath, 'utf8');
         if (!content.includes(`${CONFIG_DIR}/`)) {
@@ -89,7 +104,7 @@ async function cmdInit() {
     scaffold.injectTemplates(fw, CONFIG_DIR);
     logSuccess(`Successfully appended standard scripts for: ${CONFIG_DIR}/${fw}`);
 
-    updateGitignore();
+    await updateGitignore();
 }
 
 async function cmdAdd() {

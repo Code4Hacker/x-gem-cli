@@ -15,9 +15,11 @@ project uses CocoaPods or Swift Package Manager (SPM), figures out the actual
 deployment target your resolved SPM plugins require (instead of guessing),
 and reconciles it automatically.
 
-**Full documentation: [docs/](docs/README.md)** — getting started, every command in
+**Full documentation: [docs/](https://github.com/Code4Hacker/x-gem-cli/blob/xgem/docs/README.md)** — getting started, every command in
 depth, exactly what each framework's project-creation wizard does, the iOS build
 engine explained, Windows support, and troubleshooting. This README is a summary.
+(Absolute link on purpose — `docs/` isn't shipped inside the npm package itself,
+so a relative link would 404 on npmjs.com's rendered README.)
 
 ## Install
 
@@ -78,7 +80,7 @@ questions and a working dev-server/device launch at the end. Package manager
 (npm/yarn/pnpm/bun) is auto-detected everywhere, never assumed. Answering
 "existing" (the default) skips all of this and just scaffolds
 `.xgem-automate/` into the current directory. Full detail, including exactly
-what runs for each framework: **[docs/frameworks.md](docs/frameworks.md)**.
+what runs for each framework: **[docs/frameworks.md](https://github.com/Code4Hacker/x-gem-cli/blob/xgem/docs/frameworks.md)**.
 
 ## Architecture
 
@@ -113,7 +115,7 @@ already high enough. This is a confirmed, currently-open upstream Flutter bug
 (iOS target) detects the actual requirement from your resolved SPM plugins, patches
 every deployment-target occurrence, forces a clean regeneration, verifies it, and
 falls back to a documented direct patch if the upstream bug is still biting — full
-detail: **[docs/ios-build-engine.md](docs/ios-build-engine.md)**. Run `xgem doctor ios`
+detail: **[docs/ios-build-engine.md](https://github.com/Code4Hacker/x-gem-cli/blob/xgem/docs/ios-build-engine.md)**. Run `xgem doctor ios`
 any time for a standalone readiness report without doing a build.
 
 ## Windows support
@@ -122,7 +124,7 @@ Homebrew and the curl installer are macOS/Linux only, same as any bash tool. npm
 different: it ships a small native Windows engine (`lib-win/`) so `npm install -g
 xgem-cli` actually works in `cmd.exe`/PowerShell, no WSL required — everything except
 Flutter iOS/macOS builds (Xcode has no Windows equivalent) and the project-creation
-wizards (not ported yet). Full detail: **[docs/windows.md](docs/windows.md)**.
+wizards (not ported yet). Full detail: **[docs/windows.md](https://github.com/Code4Hacker/x-gem-cli/blob/xgem/docs/windows.md)**.
 
 ## Roadmap
 
