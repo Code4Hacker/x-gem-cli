@@ -1,6 +1,37 @@
 #!/bin/bash
-# xgem git workflow helper: cmt / init / rm-remote / rm-branch.
-# Depends on lib/logger.sh.
+# xgem git workflow helper: cmt / init / branch / rm-remote / rm-branch /
+# pr / sync / clean-branches / hooks.
+# Depends on lib/logger.sh, lib/utils.sh.
+
+# _git_default_remote -> "origin" if configured, else the first remote,
+# else empty.
+_git_default_remote() {
+    if git remote | grep -q "^origin$"; then
+        echo origin
+    else
+        git remote | head -n 1
+    fi
+}
+
+# _git_base_branch <remote> -> the repo's default branch. Prefers gh's own
+# knowledge of it (accurate, no guessing); falls back to probing common
+# names against the remote's tracking refs when gh is unavailable/offline.
+_git_base_branch() {
+    local remote=$1
+    local base
+    if has_cmd gh; then
+        base=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)
+        [ -n "$base" ] && { echo "$base"; return 0; }
+    fi
+    local candidate
+    for candidate in main master develop dev; do
+        if git show-ref --verify --quiet "refs/remotes/$remote/$candidate"; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
 
 cmd_git_cmt() {
     local commit_msg=$1
@@ -35,11 +66,7 @@ cmd_git_cmt() {
 
     local current_branch remote_name
     current_branch=$(git branch --show-current 2>/dev/null)
-    if git remote | grep -q "^origin$"; then
-        remote_name="origin"
-    else
-        remote_name=$(git remote | head -n 1)
-    fi
+    remote_name=$(_git_default_remote)
 
     if [ -z "$remote_name" ]; then
         log_warn "No remote configured — sync was skipped."
@@ -277,14 +304,213 @@ cmd_git_branch() {
     log_success "Switched to '$selected' and set as default for this repo."
 }
 
-# xgem git <cmt|init|rm-remote|rm-branch|branch> ...
+cmd_git_pr() {
+    local current_branch remote base
+    current_branch=$(git branch --show-current 2>/dev/null)
+    [ -n "$current_branch" ] || die "Not on a branch (detached HEAD?) — nothing to open a PR from."
+    remote=$(_git_default_remote)
+    [ -n "$remote" ] || die "No remote configured."
+
+    if ! has_cmd gh || ! gh auth status >/dev/null 2>&1; then
+        has_cmd gh && log_warn "GitHub CLI (gh) is installed but not authenticated — run 'gh auth login' to enable 'xgem git pr'." \
+            || log_warn "GitHub CLI (gh) is not installed — install it for 'xgem git pr' to open PRs directly: https://cli.github.com"
+        local url owner_repo remote_url
+        remote_url=$(git remote get-url "$remote" 2>/dev/null)
+        owner_repo=$(echo "$remote_url" | sed -E 's#^git@[^:]+:##; s#^https?://[^/]+/##; s#\.git$##')
+        [ -n "$owner_repo" ] || die "Could not determine owner/repo from remote '$remote' ($remote_url)."
+        base=$(_git_base_branch "$remote")
+        url="https://github.com/$owner_repo/compare/${base:-main}...$current_branch?expand=1"
+        log_info "Open this URL to create the PR manually: $url"
+        confirm "Open it in your browser now?" && _open_url "$url"
+        return 0
+    fi
+
+    base=$(_git_base_branch "$remote") || die "Could not determine the repo's base branch."
+    [ "$current_branch" != "$base" ] || die "You're on '$base' — switch to a feature branch first."
+
+    log_info "Pushing '$current_branch' to '$remote'..."
+    git push -u "$remote" "$current_branch" || die "Push failed."
+
+    if gh pr view --json number >/dev/null 2>&1; then
+        log_success "A PR for '$current_branch' already exists."
+        confirm "Open it in your browser?" && gh pr view --web
+        return 0
+    fi
+
+    local commits commit_count title body
+    commits=$(git log --format='%s' "$remote/$base..HEAD" 2>/dev/null)
+    commit_count=$(echo "$commits" | grep -c .)
+
+    if [ "$commit_count" -le 1 ]; then
+        title=$(echo "$commits" | head -1)
+        body=""
+    else
+        # sed's \U (uppercase-first) is GNU-only — BSD sed on macOS passes
+        # it through literally instead of applying it. Capitalize via tr
+        # on just the first character instead, which is portable.
+        title=$(echo "$current_branch" | sed -E 's/[-_]/ /g')
+        title="$(echo "${title:0:1}" | tr '[:lower:]' '[:upper:]')${title:1}"
+        body=$(echo "$commits" | sed 's/^/- /')
+    fi
+
+    local title_override
+    read -r -p "PR title [$title]: " title_override
+    [ -n "$title_override" ] && title="$title_override"
+    [ -n "$title" ] || die "A PR title is required."
+
+    if gh pr create --title "$title" --body "$body" --base "$base"; then
+        log_success "PR created."
+        confirm "Open it in your browser?" && gh pr view --web
+    else
+        die "gh pr create failed."
+    fi
+}
+
+cmd_git_sync() {
+    local remote base current_branch
+    remote=$(_git_default_remote)
+    [ -n "$remote" ] || die "No remote configured."
+    base=$(_git_base_branch "$remote") || die "Could not determine the repo's base branch."
+    current_branch=$(git branch --show-current 2>/dev/null)
+
+    log_info "Fetching '$base' from '$remote'..."
+    git fetch "$remote" "$base" || die "Fetch failed."
+
+    log_info "Rebasing '$current_branch' onto '$remote/$base'..."
+    if git rebase "$remote/$base"; then
+        log_success "'$current_branch' is now up to date with '$remote/$base'."
+        return 0
+    fi
+
+    local git_dir
+    git_dir=$(git rev-parse --git-dir 2>/dev/null)
+    if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ]; then
+        log_error "MERGE CONFLICT DETECTED!"
+        log_warn "Execution paused. Resolve conflicts, then 'git rebase --continue'."
+        local open_editor
+        read -r -p "Do you want to open VS Code to resolve this now? (y/n): " open_editor
+        [[ "$open_editor" == "y" || "$open_editor" == "Y" ]] && code .
+    else
+        log_error "Rebase failed — this looks like a connection problem, not a merge conflict (see the git error above)."
+    fi
+    exit 1
+}
+
+cmd_git_clean_branches() {
+    local remote base current_branch
+    remote=$(_git_default_remote)
+    [ -n "$remote" ] || die "No remote configured."
+
+    log_info "Pruning stale remote-tracking refs on '$remote'..."
+    git fetch "$remote" --prune || die "Fetch failed."
+
+    base=$(_git_base_branch "$remote") || die "Could not determine the repo's base branch."
+    current_branch=$(git branch --show-current 2>/dev/null)
+
+    local -a candidates=()
+    while IFS= read -r b; do
+        [ -n "$b" ] || continue
+        case "$b" in
+            "$current_branch"|main|master|develop|dev) continue ;;
+        esac
+        candidates+=("$b")
+    done < <(git branch --format='%(refname:short)' --merged "$remote/$base" 2>/dev/null)
+
+    if [ ${#candidates[@]} -eq 0 ]; then
+        log_success "No merged local branches to clean up."
+        return 0
+    fi
+
+    log_info "Local branches already merged into '$base':"
+    printf '  - %s\n' "${candidates[@]}"
+
+    confirm "Delete all ${#candidates[@]} of these local branches?" || { log_info "Cancelled."; return 0; }
+
+    local b
+    for b in "${candidates[@]}"; do
+        if git branch -d "$b" >/dev/null 2>&1; then
+            log_success "Deleted '$b'."
+        else
+            log_warn "Could not delete '$b' (not fully merged?) — left as-is."
+        fi
+    done
+}
+
+_GIT_HOOK_MARKER="# xgem-managed-hook"
+
+cmd_git_hooks_install() {
+    local git_dir hook_path
+    git_dir=$(git rev-parse --git-dir 2>/dev/null) || die "Not a git repository."
+    hook_path="$git_dir/hooks/pre-commit"
+
+    if [ -f "$hook_path" ] && ! grep -qF "$_GIT_HOOK_MARKER" "$hook_path"; then
+        log_warn "An existing pre-commit hook was found that xgem didn't create."
+        confirm "Overwrite it?" || { log_info "Cancelled."; return 0; }
+    fi
+
+    local run_tests xgem_path
+    read -r -p "Also run tests before commit (slower)? (y/N): " run_tests
+    xgem_path=$(command -v xgem)
+    [ -n "$xgem_path" ] || die "Could not resolve xgem's own path via 'command -v xgem'."
+
+    local checks_added=0
+    {
+        echo "#!/bin/bash"
+        echo "$_GIT_HOOK_MARKER"
+        local fw
+        for fw in "$CONFIG_DIR"/*/; do
+            [ -d "$fw" ] || continue
+            fw=$(basename "$fw")
+            if [ -f "$CONFIG_DIR/$fw/lint.sh" ]; then
+                echo "\"$xgem_path\" run $fw lint || exit 1"
+                checks_added=$((checks_added + 1))
+            fi
+            if [[ "$run_tests" == "y" || "$run_tests" == "Y" ]] && [ -f "$CONFIG_DIR/$fw/test.sh" ]; then
+                echo "\"$xgem_path\" run $fw test || exit 1"
+                checks_added=$((checks_added + 1))
+            fi
+        done
+    } > "$hook_path"
+    chmod +x "$hook_path"
+
+    if [ "$checks_added" -eq 0 ]; then
+        log_warn "No lint/test scripts found under $CONFIG_DIR — installed a hook that doesn't check anything yet."
+    fi
+    log_success "Installed pre-commit hook at $hook_path."
+}
+
+cmd_git_hooks_uninstall() {
+    local git_dir hook_path
+    git_dir=$(git rev-parse --git-dir 2>/dev/null) || die "Not a git repository."
+    hook_path="$git_dir/hooks/pre-commit"
+
+    [ -f "$hook_path" ] || { log_info "No pre-commit hook installed."; return 0; }
+    grep -qF "$_GIT_HOOK_MARKER" "$hook_path" || die "$hook_path wasn't created by xgem — not removing it."
+
+    rm -f "$hook_path"
+    log_success "Removed pre-commit hook."
+}
+
+cmd_git_hooks() {
+    case "$1" in
+        install)   cmd_git_hooks_install ;;
+        uninstall) cmd_git_hooks_uninstall ;;
+        *) die "Usage: xgem git hooks <install|uninstall>" ;;
+    esac
+}
+
+# xgem git <cmt|init|rm-remote|rm-branch|branch|pr|sync|clean-branches|hooks> ...
 cmd_git() {
     case "$1" in
-        cmt)       cmd_git_cmt "$2" ;;
-        init)      cmd_git_init ;;
-        rm-remote) cmd_git_rm_remote ;;
-        rm-branch) cmd_git_rm_branch ;;
-        branch)    cmd_git_branch ;;
-        *) die "Unknown git subcommand '$1'. Usage: xgem git <cmt|init|rm-remote|rm-branch|branch>" ;;
+        cmt)            cmd_git_cmt "$2" ;;
+        init)           cmd_git_init ;;
+        rm-remote)      cmd_git_rm_remote ;;
+        rm-branch)      cmd_git_rm_branch ;;
+        branch)         cmd_git_branch ;;
+        pr)             cmd_git_pr ;;
+        sync)           cmd_git_sync ;;
+        clean-branches) cmd_git_clean_branches ;;
+        hooks)          cmd_git_hooks "$2" ;;
+        *) die "Unknown git subcommand '$1'. Usage: xgem git <cmt|init|rm-remote|rm-branch|branch|pr|sync|clean-branches|hooks>" ;;
     esac
 }

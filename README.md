@@ -62,6 +62,14 @@ xgem git init                 Setup local repo, attach remote tracker shortcuts
 xgem git branch               Pick, create, or switch branches; remembers your choice
 xgem git rm-remote            Drop a configured remote
 xgem git rm-branch            Safely drop local and/or remote branch
+xgem git pr                   Push current branch and open a GitHub PR (gh-backed)
+xgem git sync                 Rebase current branch onto the repo's base branch
+xgem git clean-branches       Delete local branches already merged into the base branch
+xgem git hooks <install|uninstall> Manage a pre-commit lint/test hook
+xgem release [major|minor|patch] Bump version, update CHANGELOG.md, tag, push
+xgem status                   Dashboard across every xgem-tracked project
+xgem bootstrap                Clone-to-running: detect framework, install, .env, migrate, launch
+xgem ci                       Run lint/test/build for every configured framework, summarized
 xgem --version                Print xgem's version
 
 Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose

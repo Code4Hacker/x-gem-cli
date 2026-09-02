@@ -77,6 +77,47 @@ Lists local branches, lets you pick one or create a new one, checks it out, and 
 
 Interactive prompts to drop a configured remote, or safely delete a branch locally, remotely, or both (switches off a branch first if you're currently on the one being deleted).
 
+### `xgem git pr`
+
+Pushes the current branch and opens a GitHub PR via `gh`. The base branch is read from GitHub itself (`gh repo view --json defaultBranchRef`), not guessed. A single commit ahead of the base becomes the PR title as-is; multiple commits get a title derived from the branch name and a bulleted body listing each commit subject — either way you're shown the draft and can type a replacement title before it's created. If a PR for the branch already exists, it's opened instead of creating a duplicate. Without `gh` installed/authenticated, it prints (and offers to open) a GitHub compare URL instead.
+
+### `xgem git sync`
+
+Fetches and rebases the current branch onto the repo's base branch in one step. Conflict handling matches `xgem git cmt`: a real merge conflict is distinguished from a connection failure, with an offer to open VS Code.
+
+### `xgem git clean-branches`
+
+Prunes stale remote-tracking refs, then lists and (after confirmation) deletes local branches already merged into the base branch — never the current branch or `main`/`master`/`develop`/`dev`. Uses `git branch -d` (not `-D`), so a branch that isn't actually fully merged is left alone even if it slipped through. Branches merged via a GitHub squash-merge won't show up here (squash merges don't preserve ancestry) — delete those from GitHub's own "delete branch" button after merging, or locally once you've pulled a real ancestry-preserving merge.
+
+### `xgem git hooks install` / `xgem git hooks uninstall`
+
+Installs a `.git/hooks/pre-commit` hook that runs `xgem run <framework> lint` (and, if you opt in at install time, `test`) for every framework with those scripts, blocking the commit if any of them fail. Won't overwrite a pre-commit hook it didn't create without asking first; `uninstall` refuses to remove a hook it doesn't recognize as its own.
+
+## `xgem release [major|minor|patch]`
+
+Bumps the version in whichever of `package.json` / `pubspec.yaml` / `Cargo.toml` / `pyproject.toml` is present (asks which one if more than one is), defaulting to a `patch` bump if you don't pass a kind. Prepends a new `## vX.Y.Z` section to `CHANGELOG.md`, generated from `git log` since the last tag and bucketed into Features/Fixes/Other by conventional-commit prefix (`feat:`/`fix:`). Commits, tags (`vX.Y.Z`), and — after confirmation — pushes both.
+
+## `xgem status`
+
+A one-screen dashboard across every project `xgem init`/`xgem add` has ever touched (tracked in `~/.xgem/projects`, pruned automatically as directories disappear): branch, uncommitted-file count, ahead/behind its upstream, and which frameworks are configured — so you don't have to `cd` into each one to see what's dirty.
+
+## `xgem bootstrap`
+
+Clone-to-running in one command, for a project you just checked out — not a "create new project" wizard (that's `xgem init`). In order:
+
+1. **Detects the framework** from marker files (`pubspec.yaml`, `go.mod`, `Cargo.toml`, `pyproject.toml`/`requirements.txt`/`setup.py`, `Package.swift`, or a `package.json` whose dependencies are grepped to tell `next`/`angular`/`vue`/`react` apart from plain `node`). No match → the same framework picker `xgem init` uses.
+2. **`.env` setup** — if `.env.example` or `.env.sample` exists and `.env` doesn't, copies it and lists any `KEY=` lines left empty so you know what to fill in.
+3. **Installs dependencies**, package-manager-aware for node-family projects (same lockfile detection as `hard-clean`), plus `flutter pub get` / `poetry install` or a `.venv` + `pip install` / `go mod download` / `cargo fetch` / `swift package resolve` as appropriate. Docker projects have nothing to install locally.
+4. **Runs migrations** — best-effort and always behind a confirmation: a `migrate` script in `package.json`, else `npx prisma migrate dev` if `prisma/schema.prisma` exists, else `python3 manage.py migrate` if `manage.py` exists. No match → skipped silently, not every project has one.
+5. **Offers to scaffold `.xgem-automate`** if this project hasn't been xgem-tracked before, so `xgem run`/`xgem status`/`xgem ci` work here too.
+6. **Offers to launch the dev server** for node-family projects (`node`→`start`, `react`/`vue`/`angular`/`next`→`dev`) once step 5 has scaffolded that script.
+
+Any tool that isn't installed is skipped with a warning rather than failing the whole run.
+
+## `xgem ci`
+
+Runs `lint` → `test` → `build` (in that order) for every framework already configured under `.xgem-automate/`, skipping any script that isn't scaffolded for a given framework. Unlike a pre-commit hook, it doesn't stop at the first failure — it runs everything and prints a pass/fail summary at the end, exiting non-zero if anything failed, so you see everything that's broken in one pass instead of a slow fix-one-rerun loop. Requires `.xgem-automate` to already exist (`xgem init`/`xgem add`/`xgem bootstrap` first).
+
 ## `xgem <framework>`
 
 Prints that framework's status (whether it's been added to this workspace) and its available scripts — e.g. `xgem react`, `xgem flutter`. Doesn't run anything.

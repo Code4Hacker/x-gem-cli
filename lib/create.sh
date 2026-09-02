@@ -42,6 +42,7 @@ XGEM_CREATED_NEW_FOLDER=""
 _xgem_bookkeeping() {
     local fw=$1
     mkdir -p "$CONFIG_DIR"
+    registry_add "$(pwd)"
     scaffold_inject_templates "$fw" "$CONFIG_DIR"
     log_success "Successfully appended standard scripts for: $CONFIG_DIR/$fw"
 
@@ -96,15 +97,6 @@ _enter_project_dir() {
     [ "$project_dir" = "." ] && return 0
     XGEM_CREATED_NEW_FOLDER="$project_dir"
     mkdir -p "$project_dir" && cd "$project_dir" || die "Could not enter $project_dir"
-}
-
-_open_url() {
-    local url=$1
-    case "$(detect_os)" in
-        darwin) open "$url" 2>/dev/null ;;
-        linux)  xdg-open "$url" 2>/dev/null ;;
-        *) log_debug "Don't know how to open a browser on this OS — visit $url manually." ;;
-    esac
 }
 
 # _launch_dev_server_and_open_browser <cmd...>

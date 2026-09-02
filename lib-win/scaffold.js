@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { logInfo, logSuccess, logWarn, logError, die } = require('./logger');
+const { prompt } = require('./utils');
 
 const ALL_FRAMEWORKS = ['flutter', 'node', 'python', 'react', 'vue', 'angular', 'next', 'go', 'rust', 'docker'];
 
@@ -99,4 +100,43 @@ function getRemainingFrameworks(configDir) {
     return ALL_FRAMEWORKS.filter((fw) => !fs.existsSync(path.join(configDir, fw)));
 }
 
-module.exports = { ALL_FRAMEWORKS, frameworkScripts, injectTemplates, runScript, getRemainingFrameworks };
+// Some teams want the generated scripts checked in so collaborators get the
+// same automation; others want them private/local-only. Ask instead of
+// always gitignoring.
+async function updateGitignore(configDir) {
+    const gitignorePath = '.gitignore';
+    const ignoreChoice = (await prompt(`Should ${configDir}/ be ignored by git (private to you), or tracked so collaborators get the same scripts? [ignore/track]`, 'ignore')).toLowerCase();
+
+    if (ignoreChoice.startsWith('t')) {
+        if (fs.existsSync(gitignorePath)) {
+            const lines = fs.readFileSync(gitignorePath, 'utf8').split(/\r?\n/).filter((l) => l !== `${configDir}/`);
+            fs.writeFileSync(gitignorePath, lines.join('\n'));
+            logInfo(`Removed existing ${configDir}/ entry from .gitignore since you chose to track it.`);
+        }
+        logSuccess(`${configDir}/ will be tracked in git.`);
+        return;
+    }
+
+    if (fs.existsSync(gitignorePath)) {
+        const content = fs.readFileSync(gitignorePath, 'utf8');
+        if (!content.includes(`${configDir}/`)) {
+            fs.appendFileSync(gitignorePath, `\n${configDir}/\n`);
+            logSuccess('Added automation tracking to .gitignore');
+        }
+    } else {
+        fs.writeFileSync(gitignorePath, `${configDir}/\n`);
+        logSuccess('Created .gitignore and hidden tracking layer folder references.');
+    }
+}
+
+// bookkeeping(fw, configDir) — creates configDir/fw's scripts and updates
+// .gitignore. Called from both `xgem init` and `xgem bootstrap` so a
+// project scaffolded either way ends up in the same state.
+async function bookkeeping(fw, configDir) {
+    fs.mkdirSync(configDir, { recursive: true });
+    injectTemplates(fw, configDir);
+    logSuccess(`Successfully appended standard scripts for: ${configDir}/${fw}`);
+    await updateGitignore(configDir);
+}
+
+module.exports = { ALL_FRAMEWORKS, frameworkScripts, injectTemplates, runScript, getRemainingFrameworks, updateGitignore, bookkeeping };

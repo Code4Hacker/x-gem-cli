@@ -21,6 +21,11 @@ const { cmdDoctor } = require('../lib-win/doctor');
 const { cmdGit } = require('../lib-win/git');
 const { cmdFlutter } = require('../lib-win/flutter');
 const scaffold = require('../lib-win/scaffold');
+const { cmdRelease } = require('../lib-win/release');
+const { registryAdd, registryRemove } = require('../lib-win/registry');
+const { cmdStatus } = require('../lib-win/status');
+const { cmdBootstrap } = require('../lib-win/bootstrap');
+const { cmdCi } = require('../lib-win/ci');
 
 const CONFIG_DIR = '.xgem-automate';
 
@@ -48,6 +53,14 @@ function printUsage() {
     console.log('  xgem git branch               - Pick, create, or switch branches; remembers your choice');
     console.log('  xgem git rm-remote            - Drop specified target remote tracing rules');
     console.log('  xgem git rm-branch            - Safely drop local and remote workspace branch states');
+    console.log('  xgem git pr                   - Push current branch and open a GitHub PR (gh-backed)');
+    console.log('  xgem git sync                 - Rebase current branch onto the repo\'s base branch');
+    console.log('  xgem git clean-branches       - Delete local branches already merged into the base branch');
+    console.log('  xgem git hooks <install|uninstall> - Manage a pre-commit lint/test hook');
+    console.log('  xgem release [major|minor|patch] - Bump version, update CHANGELOG.md, tag, push');
+    console.log('  xgem status                   - Dashboard across every xgem-tracked project');
+    console.log('  xgem bootstrap                - Clone-to-running: detect framework, install, .env, migrate, launch');
+    console.log('  xgem ci                       - Run lint/test/build for every configured framework, summarized');
     console.log('  xgem --version                - Print xgem\'s version');
     console.log('');
     console.log('Flags (any command): --yes (skip confirmations), --dry-run (show, don\'t apply), --verbose');
@@ -61,35 +74,6 @@ async function selectFramework(options) {
     return options[idx];
 }
 
-// Some teams want the generated scripts checked in so collaborators get the
-// same automation; others want them private/local-only. Ask instead of
-// always gitignoring.
-async function updateGitignore() {
-    const gitignorePath = '.gitignore';
-    const ignoreChoice = ((await prompt(`Should ${CONFIG_DIR}/ be ignored by git (private to you), or tracked so collaborators get the same scripts? [ignore/track]`, 'ignore'))).toLowerCase();
-
-    if (ignoreChoice.startsWith('t')) {
-        if (fs.existsSync(gitignorePath)) {
-            const lines = fs.readFileSync(gitignorePath, 'utf8').split(/\r?\n/).filter((l) => l !== `${CONFIG_DIR}/`);
-            fs.writeFileSync(gitignorePath, lines.join('\n'));
-            logInfo(`Removed existing ${CONFIG_DIR}/ entry from .gitignore since you chose to track it.`);
-        }
-        logSuccess(`${CONFIG_DIR}/ will be tracked in git.`);
-        return;
-    }
-
-    if (fs.existsSync(gitignorePath)) {
-        const content = fs.readFileSync(gitignorePath, 'utf8');
-        if (!content.includes(`${CONFIG_DIR}/`)) {
-            fs.appendFileSync(gitignorePath, `\n${CONFIG_DIR}/\n`);
-            logSuccess('Added automation tracking to .gitignore');
-        }
-    } else {
-        fs.writeFileSync(gitignorePath, `${CONFIG_DIR}/\n`);
-        logSuccess('Created .gitignore and hidden tracking layer folder references.');
-    }
-}
-
 async function cmdInit() {
     printBanner();
     if (fs.existsSync(CONFIG_DIR)) {
@@ -97,14 +81,12 @@ async function cmdInit() {
         return;
     }
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    registryAdd(process.cwd());
 
     console.log('Select your starting framework architecture:');
     const fw = await selectFramework(scaffold.ALL_FRAMEWORKS);
     if (!fw) die('Invalid selection.');
-    scaffold.injectTemplates(fw, CONFIG_DIR);
-    logSuccess(`Successfully appended standard scripts for: ${CONFIG_DIR}/${fw}`);
-
-    await updateGitignore();
+    await scaffold.bookkeeping(fw, CONFIG_DIR);
 }
 
 async function cmdAdd() {
@@ -154,6 +136,7 @@ async function cmdTerminate() {
         fs.rmSync(path.join(CONFIG_DIR, fw), { recursive: true, force: true });
     }
     fs.rmSync(CONFIG_DIR, { recursive: true, force: true });
+    registryRemove(process.cwd());
 
     if (fs.existsSync('.gitignore')) {
         const lines = fs.readFileSync('.gitignore', 'utf8').split(/\r?\n/).filter((l) => l !== `${CONFIG_DIR}/`);
@@ -203,9 +186,13 @@ async function main() {
         case 'run': return cmdRun(a2, a3);
         case 'terminate': return cmdTerminate();
         case 'git':
-            if (!a2) die('Usage: xgem git <cmt|init|branch|rm-remote|rm-branch>');
-            return cmdGit(a2, a3);
+            if (!a2) die('Usage: xgem git <cmt|init|branch|rm-remote|rm-branch|pr|sync|clean-branches|hooks>');
+            return cmdGit(a2, a3, CONFIG_DIR);
         case 'doctor': return cmdDoctor(a2);
+        case 'release': return cmdRelease(a2);
+        case 'status': return cmdStatus(CONFIG_DIR);
+        case 'bootstrap': return cmdBootstrap(CONFIG_DIR);
+        case 'ci': return cmdCi(CONFIG_DIR);
         case '--version':
         case '-V':
         case 'version': {

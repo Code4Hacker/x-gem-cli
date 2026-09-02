@@ -35,6 +35,16 @@ source "$XGEM_HOME/lib/flutter.sh"
 source "$XGEM_HOME/lib/scaffold.sh"
 # shellcheck source=lib/create.sh
 source "$XGEM_HOME/lib/create.sh"
+# shellcheck source=lib/release.sh
+source "$XGEM_HOME/lib/release.sh"
+# shellcheck source=lib/registry.sh
+source "$XGEM_HOME/lib/registry.sh"
+# shellcheck source=lib/status.sh
+source "$XGEM_HOME/lib/status.sh"
+# shellcheck source=lib/bootstrap.sh
+source "$XGEM_HOME/lib/bootstrap.sh"
+# shellcheck source=lib/ci.sh
+source "$XGEM_HOME/lib/ci.sh"
 
 CONFIG_DIR=".xgem-automate"
 
@@ -75,6 +85,14 @@ print_usage() {
     echo "  xgem git branch               - Pick, create, or switch branches; remembers your choice"
     echo "  xgem git rm-remote            - Drop specified target remote tracing rules"
     echo "  xgem git rm-branch            - Safely drop local and remote workspace branch states"
+    echo "  xgem git pr                   - Push current branch and open a GitHub PR (gh-backed)"
+    echo "  xgem git sync                 - Rebase current branch onto the repo's base branch"
+    echo "  xgem git clean-branches       - Delete local branches already merged into the base branch"
+    echo "  xgem git hooks <install|uninstall> - Manage a pre-commit lint/test hook"
+    echo "  xgem release [major|minor|patch] - Bump version, update CHANGELOG.md, tag, push"
+    echo "  xgem status                   - Dashboard across every xgem-tracked project"
+    echo "  xgem bootstrap                - Clone-to-running: detect framework, install, .env, migrate, launch"
+    echo "  xgem ci                       - Run lint/test/build for every configured framework, summarized"
     echo "  xgem --version                - Print xgem's version"
     echo ""
     echo "Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose"
@@ -161,7 +179,7 @@ case "${1:-}" in
         else
             scaffold_run_script "$FRAMEWORK" "$SCRIPT_NAME" "$CONFIG_DIR"
         fi
-        exit 0
+        exit $?
         ;;
 
     terminate)
@@ -178,6 +196,7 @@ case "${1:-}" in
             rm -rf "${CONFIG_DIR:?}/$fw"
         done
         rm -rf "$CONFIG_DIR"
+        registry_remove "$(pwd)"
 
         if [ -f .gitignore ]; then
             grep -v "^$CONFIG_DIR/" .gitignore > tmp_gitignore && mv tmp_gitignore .gitignore
@@ -189,7 +208,7 @@ case "${1:-}" in
         ;;
 
     git)
-        [ -n "${2:-}" ] || die "Usage: xgem git <cmt|init|branch|rm-remote|rm-branch>"
+        [ -n "${2:-}" ] || die "Usage: xgem git <cmt|init|branch|rm-remote|rm-branch|pr|sync|clean-branches|hooks>"
         cmd_git "$2" "${3:-}"
         exit 0
         ;;
@@ -197,6 +216,26 @@ case "${1:-}" in
     doctor)
         cmd_doctor "${2:-}" "${3:-.}"
         exit 0
+        ;;
+
+    release)
+        cmd_release "${2:-}"
+        exit 0
+        ;;
+
+    status)
+        cmd_status
+        exit 0
+        ;;
+
+    bootstrap)
+        cmd_bootstrap
+        exit 0
+        ;;
+
+    ci)
+        cmd_ci
+        exit $?
         ;;
 
     --version|-V|version)

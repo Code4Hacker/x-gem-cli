@@ -42,6 +42,17 @@ require_cmd() {
     fi
 }
 
+# _open_url <url> — best-effort browser open, silent no-op on an OS xgem
+# doesn't know how to open a browser on.
+_open_url() {
+    local url=$1
+    case "$(detect_os)" in
+        darwin) open "$url" 2>/dev/null ;;
+        linux)  xdg-open "$url" 2>/dev/null ;;
+        *) log_debug "Don't know how to open a browser on this OS — visit $url manually." ;;
+    esac
+}
+
 # confirm "prompt text" -> 0 if approved, 1 otherwise
 # Honors XGEM_YES=1 (from --yes) to auto-approve, and always returns 1
 # (declines) under XGEM_DRY_RUN so callers never apply changes in dry-run mode.

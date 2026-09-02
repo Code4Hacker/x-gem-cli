@@ -32,6 +32,11 @@ function getVersion(name, args = ['--version']) {
     return out ? out.trim() : null;
 }
 
+// openUrl(url) — best-effort browser open on Windows.
+function openUrl(url) {
+    spawnSync('cmd', ['/c', 'start', '""', url], { stdio: 'ignore' });
+}
+
 // confirm(prompt) -> Promise<boolean>. Honors XGEM_YES (auto-approve) and
 // XGEM_DRY_RUN (always decline, just like lib/utils.sh's confirm()).
 function confirm(prompt) {
@@ -64,4 +69,4 @@ function prompt(question, defaultValue = '') {
     });
 }
 
-module.exports = { detectArch, hasCmd, requireCmd, getVersion, confirm, prompt };
+module.exports = { detectArch, hasCmd, requireCmd, getVersion, confirm, prompt, openUrl };
