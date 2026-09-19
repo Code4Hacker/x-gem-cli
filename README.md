@@ -54,7 +54,8 @@ xgem add                      Interactive state-aware addition of remaining fram
 xgem run <framework> <script> Run a workspace automation command script
 xgem terminate                Purge all generated automated layouts completely
 xgem <framework> [help]       View tailored instructions for a specific script layout
-xgem doctor                   Report on your environment (OS, arch, toolchains found)
+xgem doctor                   Toolchain report: versions, where found (fvm/nvm/brew), update checks, install links
+xgem update [tool]            Update installed toolchains (flutter, node, rust, ...) after confirmation
 xgem doctor ios [path]        Report on iOS build readiness: CocoaPods vs SPM, deployment
                                targets per config, and whether they're reconciled
 xgem git cmt "message"        Auto-stage, commit, rebase-pull, and push
@@ -72,7 +73,7 @@ xgem bootstrap                Clone-to-running: detect framework, install, .env,
 xgem ci                       Run lint/test/build for every configured framework, summarized
 xgem --version                Print xgem's version
 
-Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose
+Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose, --no-network (skip update lookups)
 ```
 
 ## Supported frameworks
@@ -97,7 +98,9 @@ bin/xgem       thin dispatcher — no business logic, just resolves paths and ro
 lib/
   logger.sh    log levels + verbose mode
   utils.sh     os/arch detection, confirm(), require_cmd()
-  doctor.sh    environment + feature detection ("xgem doctor")
+  toolchain.sh finds tools behind fvm/nvm/etc., offers installs, checks latest versions
+  update.sh    xgem update
+  doctor.sh    toolchain report ("xgem doctor")
   ios.sh       the SwiftPM-aware iOS build engine
   flutter.sh   flutter command group (build/hard-clean/build-runner), delegates iOS builds to ios.sh
   git.sh       git cmt/init/branch/rm-remote/rm-branch

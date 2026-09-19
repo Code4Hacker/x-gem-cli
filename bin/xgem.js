@@ -26,6 +26,7 @@ const { registryAdd, registryRemove } = require('../lib-win/registry');
 const { cmdStatus } = require('../lib-win/status');
 const { cmdBootstrap } = require('../lib-win/bootstrap');
 const { cmdCi } = require('../lib-win/ci');
+const { cmdUpdate } = require('../lib-win/update');
 
 const CONFIG_DIR = '.xgem-automate';
 
@@ -47,7 +48,8 @@ function printUsage() {
     console.log('  xgem run <framework> <script> - Run a workspace automation command script');
     console.log('  xgem terminate                - Purge all generated automated layouts completely');
     console.log('  xgem <framework> [help]       - View tailored instructions for a specific script layout');
-    console.log('  xgem doctor [ios]             - Report on your environment / iOS build availability');
+    console.log('  xgem doctor [ios]             - Toolchain report (finds fvm/nvm installs, links, update checks)');
+    console.log('  xgem update [tool]            - Update installed toolchains (flutter, node, rust, ...) after confirmation');
     console.log('  xgem git cmt "message"        - Auto-stage, commit, rebase-pull, and push');
     console.log('  xgem git init                 - Setup local repo, attach remote tracker shortcuts');
     console.log('  xgem git branch               - Pick, create, or switch branches; remembers your choice');
@@ -63,7 +65,7 @@ function printUsage() {
     console.log('  xgem ci                       - Run lint/test/build for every configured framework, summarized');
     console.log('  xgem --version                - Print xgem\'s version');
     console.log('');
-    console.log('Flags (any command): --yes (skip confirmations), --dry-run (show, don\'t apply), --verbose');
+    console.log('Flags (any command): --yes (skip confirmations), --dry-run (show, don\'t apply), --verbose, --no-network (skip update lookups)');
 }
 
 async function selectFramework(options) {
@@ -175,6 +177,7 @@ async function main() {
         if (arg === '--yes') process.env.XGEM_YES = '1';
         else if (arg === '--dry-run') process.env.XGEM_DRY_RUN = '1';
         else if (arg === '--verbose') process.env.XGEM_VERBOSE = '1';
+        else if (arg === '--no-network') process.env.XGEM_NO_NETWORK = '1';
         else args.push(arg);
     }
 
@@ -189,6 +192,7 @@ async function main() {
             if (!a2) die('Usage: xgem git <cmt|init|branch|rm-remote|rm-branch|pr|sync|clean-branches|hooks>');
             return cmdGit(a2, a3, CONFIG_DIR);
         case 'doctor': return cmdDoctor(a2);
+        case 'update': return cmdUpdate(a2);
         case 'release': return cmdRelease(a2);
         case 'status': return cmdStatus(CONFIG_DIR);
         case 'bootstrap': return cmdBootstrap(CONFIG_DIR);

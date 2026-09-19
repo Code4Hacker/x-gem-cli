@@ -8,8 +8,13 @@ const { spawnSync } = require('node:child_process');
 const { logInfo, logSuccess, logWarn, logDebug, die } = require('./logger');
 const { hasCmd, confirm, prompt } = require('./utils');
 const scaffold = require('./scaffold');
+const toolchain = require('./toolchain');
 
 function run(cmd, args, opts = {}) {
+    if (process.env.XGEM_DRY_RUN === '1') {
+        logInfo(`(dry-run) would run: ${cmd} ${args.join(' ')}`);
+        return { status: 0 };
+    }
     return spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32', ...opts });
 }
 
@@ -42,6 +47,10 @@ async function bootstrapEnvFile() {
     if (fs.existsSync('.env')) { logDebug('.env already exists, leaving it as-is.'); return; }
     for (const example of ['.env.example', '.env.sample']) {
         if (!fs.existsSync(example)) continue;
+        if (process.env.XGEM_DRY_RUN === '1') {
+            logInfo(`(dry-run) would create .env from ${example}`);
+            return;
+        }
         fs.copyFileSync(example, '.env');
         logSuccess(`Created .env from ${example}.`);
         const missing = fs.readFileSync('.env', 'utf8')
@@ -72,6 +81,22 @@ function installWith(pm, extraArgs = []) {
     }
 }
 
+async function preflight(fw) {
+    const tool = toolchain.fwTool(fw);
+    if (tool && !(await toolchain.ensure(tool))) return false;
+    if (fw === 'flutter' && !(await toolchain.ensure('dart'))) return false;
+    if (['node', 'react', 'vue', 'angular', 'next'].includes(fw)) {
+        const pm = nodePm();
+        if (pm !== 'npm' && !hasCmd(pm)) {
+            logWarn(`This project uses ${pm} (lockfile found) but '${pm}' isn't installed.`);
+            console.log(`  Enable it via Node's bundled corepack:  corepack enable   (or: npm install -g ${pm})`);
+            if (!(await confirm(`Run 'npm install -g ${pm}' now?`))) return false;
+            run('npm', ['install', '-g', pm]);
+        }
+    }
+    return true;
+}
+
 async function bootstrapInstall(fw) {
     switch (fw) {
         case 'node':
@@ -80,36 +105,33 @@ async function bootstrapInstall(fw) {
         case 'angular':
         case 'next': {
             const pm = nodePm();
+            if (!(await confirm(`Install dependencies with ${pm}?`))) break;
             logInfo(`Installing dependencies with ${pm}...`);
             installWith(pm);
             break;
         }
         case 'flutter':
-            if (!hasCmd('flutter')) { logWarn("flutter not found — skipping 'flutter pub get'."); break; }
-            logInfo('Running flutter pub get...');
+            if (!(await confirm("Run 'flutter pub get'?"))) break;
             run('flutter', ['pub', 'get']);
             break;
         case 'python':
             if (fs.existsSync('pyproject.toml') && hasCmd('poetry')) {
-                logInfo('Installing dependencies with poetry...');
+                if (!(await confirm('Install dependencies with poetry?'))) break;
                 run('poetry', ['install']);
             } else if (fs.existsSync('requirements.txt')) {
-                if (!hasCmd('python') && !hasCmd('python3')) { logWarn('python not found — skipping install.'); break; }
                 const py = hasCmd('python') ? 'python' : 'python3';
+                if (!(await confirm('Create .venv and install requirements.txt into it?'))) break;
                 if (!fs.existsSync('.venv')) run(py, ['-m', 'venv', '.venv']);
                 const pipPath = process.platform === 'win32' ? path.join('.venv', 'Scripts', 'pip.exe') : path.join('.venv', 'bin', 'pip');
-                logInfo('Installing dependencies into .venv...');
                 run(pipPath, ['install', '-r', 'requirements.txt']);
             }
             break;
         case 'go':
-            if (!hasCmd('go')) { logWarn("go not found — skipping 'go mod download'."); break; }
-            logInfo('Running go mod download...');
+            if (!(await confirm("Run 'go mod download'?"))) break;
             run('go', ['mod', 'download']);
             break;
         case 'rust':
-            if (!hasCmd('cargo')) { logWarn("cargo not found — skipping 'cargo fetch'."); break; }
-            logInfo('Running cargo fetch...');
+            if (!(await confirm("Run 'cargo fetch'?"))) break;
             run('cargo', ['fetch']);
             break;
         case 'docker':
@@ -172,6 +194,7 @@ async function cmdBootstrap(configDir) {
         logSuccess(`Detected: ${fw}`);
     }
 
+    if (!(await preflight(fw))) die('Bootstrap stopped: a required tool is missing.');
     await bootstrapEnvFile();
     await bootstrapInstall(fw);
     await bootstrapMigrations(fw);

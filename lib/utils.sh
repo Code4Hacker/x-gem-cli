@@ -24,21 +24,29 @@ is_apple_silicon() {
     [ "$(detect_os)" = "darwin" ] && [ "$(detect_arch)" = "arm64" ]
 }
 
-# has_cmd <name> -> 0/1, no output
+# has_cmd <name> -> 0/1, no output. Also finds tools that version managers
+# (fvm, nvm, ...) keep off PATH, and puts them on this process's PATH.
 has_cmd() {
-    command -v "$1" >/dev/null 2>&1
+    command -v "$1" >/dev/null 2>&1 && return 0
+    if declare -F tool_known >/dev/null 2>&1 && tool_known "$1"; then
+        tool_resolve "$1" && tool_activate
+        return $?
+    fi
+    return 1
 }
 
 # require_cmd <name> [install-hint]
 require_cmd() {
     local name=$1
     local hint=${2:-}
-    if ! has_cmd "$name"; then
-        if [ -n "$hint" ]; then
-            die "'$name' is required but not found. $hint"
-        else
-            die "'$name' is required but not found in PATH."
-        fi
+    has_cmd "$name" && return 0
+    if declare -F tool_known >/dev/null 2>&1 && tool_known "$name"; then
+        tool_ensure "$(_tool_canon "$name")" && return 0
+    fi
+    if [ -n "$hint" ]; then
+        die "'$name' is required but not found. $hint"
+    else
+        die "'$name' is required but not found in PATH."
     fi
 }
 

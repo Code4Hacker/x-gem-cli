@@ -37,21 +37,93 @@ flutter_config_spm_enabled() {
     fi
 }
 
+_doctor_tools() {
+    echo git flutter dart node python3 go cargo docker gh fvm
+    [ "$(detect_os)" = "darwin" ] && echo swift
+}
+
+_doctor_tool_row() {
+    local tool=$1 version latest where mgr pin
+    if ! tool_resolve "$tool"; then
+        printf '  %-9s %-11s %s\n' "$tool" "not found" "download: $(tool_url "$tool")"
+        local recipe
+        recipe=$(tool_install_cmd "$tool")
+        [ -n "$recipe" ] && echo "            install:  $recipe   (or run: xgem update $tool)"
+        return 0
+    fi
+
+    version=$(tool_version_of "$tool")
+    mgr=$TOOL_MANAGER
+    where=$(_tool_pretty "$TOOL_PATH")
+    printf '  %-9s %-11s %s%s\n' "$tool" "${version:-unknown}" "$where" "$([ "$mgr" = system ] || [ "$mgr" = other ] || echo " ($mgr)")"
+
+    if [ "$TOOL_ON_PATH" = "0" ] && [ "$tool" != "dart" ]; then
+        echo "            ! not on PATH: found via $mgr, so plain scripts and CI won't see it (an alias such as alias flutter='fvm flutter' isn't visible to scripts; xgem resolves it for its own commands)"
+    fi
+
+    latest=$(XGEM_NO_NETWORK=1 tool_latest "$tool")
+    if [ -n "$version" ] && [ -n "$latest" ] && _tool_ver_lt "$version" "$latest"; then
+        echo "            ^ update available: $version -> $latest   (run: xgem update $tool)"
+    fi
+
+    pin=""
+    [ "$tool" != "dart" ] && pin=$(tool_pin "$tool")
+    if [ -n "$pin" ] && [ -n "$version" ] && [[ "$pin" =~ ^[0-9] ]]; then
+        case "$version" in
+            "$pin"*) ;;
+            *) echo "            ! this project pins $tool $pin but the active one is $version" ;;
+        esac
+    fi
+}
+
+_doctor_version_managers() {
+    local -a found=()
+    [ -d "${NVM_DIR:-$HOME/.nvm}" ] && found+=(nvm)
+    command -v fnm >/dev/null 2>&1 && found+=(fnm)
+    { [ -d "$HOME/.volta" ] || command -v volta >/dev/null 2>&1; } && found+=(volta)
+    { [ -d "$HOME/.asdf" ] || command -v asdf >/dev/null 2>&1; } && found+=(asdf)
+    command -v mise >/dev/null 2>&1 && found+=(mise)
+    { [ -d "$HOME/.pyenv" ] || command -v pyenv >/dev/null 2>&1; } && found+=(pyenv)
+    { [ -x "$HOME/.cargo/bin/rustup" ] || command -v rustup >/dev/null 2>&1; } && found+=(rustup)
+    { [ -d "$HOME/.puro" ] || command -v puro >/dev/null 2>&1; } && found+=(puro)
+    if [ ${#found[@]} -gt 0 ]; then
+        echo "Version managers: ${found[*]}  (fvm is listed with the tools above)"
+    else
+        echo "Version managers: none detected"
+    fi
+}
+
 doctor_print_general() {
     echo -e "\033[1;36m=== xgem doctor ===\033[0m"
-    echo "OS:              $(detect_os)"
-    echo "Arch:            $(detect_arch)$( is_apple_silicon && echo ' (Apple Silicon)' )"
-    echo "git:             $(doctor_tool_version git)"
-    echo "flutter:         $(doctor_tool_version flutter)"
-    echo "dart:            $(doctor_tool_version dart)"
-    echo "node:            $(doctor_tool_version node)"
-    echo "python3:         $(doctor_tool_version python3)"
-    echo "go:              $(doctor_tool_version go version)"
-    echo "cargo:           $(doctor_tool_version cargo)"
-    echo "docker:          $(doctor_tool_version docker)"
+    echo "OS:   $(detect_os)   Arch: $(detect_arch)$( is_apple_silicon && echo ' (Apple Silicon)' )"
+    echo ""
+
+    local t
+    if [ "$XGEM_NO_NETWORK" != "1" ]; then
+        log_info "Checking installed tools and the latest available versions..."
+        for t in $(_doctor_tools); do
+            ( tool_resolve "$t" && tool_latest "$t" ) >/dev/null 2>&1 &
+        done
+        wait
+    fi
+
+    echo -e "\033[1;36mToolchains\033[0m"
+    for t in $(_doctor_tools); do
+        _doctor_tool_row "$t"
+    done
+    echo ""
+    _doctor_version_managers
+
     if [ "$(detect_os)" = "darwin" ]; then
+        echo ""
         echo "xcodebuild:      $(doctor_tool_version xcodebuild -version)"
         echo "pod (CocoaPods): $(doctor_tool_version pod)"
+        has_cmd pod || echo "                 install: brew install cocoapods   (https://cocoapods.org)"
+    fi
+
+    if [ "$XGEM_NO_NETWORK" = "1" ] && [ ! -d "$XGEM_CACHE_DIR" ]; then
+        echo ""
+        log_info "Update checks were skipped (--no-network) and nothing is cached yet."
     fi
 }
 
@@ -115,6 +187,6 @@ cmd_doctor() {
     case "${1:-}" in
         ios) doctor_print_ios "${2:-.}" ;;
         "")  doctor_print_general ;;
-        *)   die "Unknown doctor target '$1'. Usage: xgem doctor [ios]" ;;
+        *)   die "Unknown doctor target '$1'. Usage: xgem doctor [ios] [--no-network]" ;;
     esac
 }

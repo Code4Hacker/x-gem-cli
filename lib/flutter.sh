@@ -6,6 +6,7 @@
 # Depends on lib/logger.sh, lib/utils.sh, lib/ios.sh.
 
 cmd_flutter_hard_clean() {
+    require_cmd flutter
     log_info "Cleaning Flutter project..."
     rm -f pubspec.lock
     flutter clean
@@ -41,6 +42,7 @@ cmd_flutter_hard_clean() {
 }
 
 cmd_flutter_build_runner() {
+    require_cmd flutter
     log_info "Running Flutter Build Runner..."
     local verbose_choice
     read -r -p "Run in verbose mode? (Y/n): " verbose_choice
@@ -158,6 +160,7 @@ _flutter_build_ios() {
 }
 
 cmd_flutter_build() {
+    require_cmd flutter
     echo -e "\033[1;34m--- Flutter Build Orchestrator ---\033[0m"
 
     local current_name="" current_num="" current_full

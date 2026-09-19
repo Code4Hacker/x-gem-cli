@@ -30,6 +30,10 @@ _bootstrap_env_file() {
     local example
     for example in .env.example .env.sample; do
         [ -f "$example" ] || continue
+        if [ "$XGEM_DRY_RUN" = "1" ]; then
+            log_info "(dry-run) would create .env from $example"
+            return 0
+        fi
         cp "$example" .env
         log_success "Created .env from $example."
         local missing
@@ -50,50 +54,76 @@ _bootstrap_node_pm() {
     fi
 }
 
+_bootstrap_preflight() {
+    local fw=$1 tool pm
+    tool=$(fw_required_tool "$fw")
+    [ -n "$tool" ] && [ "$fw" != "docker" ] && { tool_ensure "$tool" || return 1; }
+    case "$fw" in
+        flutter) tool_ensure dart || return 1 ;;
+        node|react|vue|angular|next)
+            pm=$(_bootstrap_node_pm)
+            if [ "$pm" != "npm" ] && ! has_cmd "$pm"; then
+                log_warn "This project uses $pm (lockfile found) but '$pm' isn't installed."
+                echo "  Enable it via Node's bundled corepack:  corepack enable   (or: npm install -g $pm)"
+                if confirm "Run 'npm install -g $pm' now?"; then
+                    _bootstrap_run npm install -g "$pm" || return 1
+                else
+                    return 1
+                fi
+            fi
+            ;;
+    esac
+    return 0
+}
+
+_bootstrap_run() {
+    if [ "$XGEM_DRY_RUN" = "1" ]; then
+        log_info "(dry-run) would run: $*"
+        return 0
+    fi
+    "$@"
+}
+
 _bootstrap_install() {
     local fw=$1
     case "$fw" in
         node|react|vue|angular|next)
             local pm
             pm=$(_bootstrap_node_pm)
+            confirm "Install dependencies with $pm?" || return 0
             log_info "Installing dependencies with $pm..."
             case "$pm" in
-                yarn) yarn ;;
-                pnpm) pnpm install ;;
-                bun)  bun install ;;
-                *)    npm install ;;
+                yarn) _bootstrap_run yarn ;;
+                pnpm) _bootstrap_run pnpm install ;;
+                bun)  _bootstrap_run bun install ;;
+                *)    _bootstrap_run npm install ;;
             esac
             ;;
         flutter)
-            has_cmd flutter || { log_warn "flutter not found — skipping 'flutter pub get'."; return 0; }
-            log_info "Running flutter pub get..."
-            flutter pub get
+            confirm "Run 'flutter pub get'?" || return 0
+            _bootstrap_run flutter pub get
             ;;
         python)
             if [ -f pyproject.toml ] && has_cmd poetry; then
-                log_info "Installing dependencies with poetry..."
-                poetry install
+                confirm "Install dependencies with poetry?" || return 0
+                _bootstrap_run poetry install
             elif [ -f requirements.txt ]; then
-                has_cmd python3 || { log_warn "python3 not found — skipping install."; return 0; }
-                [ -d .venv ] || python3 -m venv .venv
-                log_info "Installing dependencies into .venv..."
-                .venv/bin/pip install -r requirements.txt
+                confirm "Create .venv and install requirements.txt into it?" || return 0
+                [ -d .venv ] || _bootstrap_run python3 -m venv .venv
+                _bootstrap_run .venv/bin/pip install -r requirements.txt
             fi
             ;;
         go)
-            has_cmd go || { log_warn "go not found — skipping 'go mod download'."; return 0; }
-            log_info "Running go mod download..."
-            go mod download
+            confirm "Run 'go mod download'?" || return 0
+            _bootstrap_run go mod download
             ;;
         rust)
-            has_cmd cargo || { log_warn "cargo not found — skipping 'cargo fetch'."; return 0; }
-            log_info "Running cargo fetch..."
-            cargo fetch
+            confirm "Run 'cargo fetch'?" || return 0
+            _bootstrap_run cargo fetch
             ;;
         swift)
-            has_cmd swift || { log_warn "swift not found — skipping 'swift package resolve'."; return 0; }
-            log_info "Running swift package resolve..."
-            swift package resolve
+            confirm "Run 'swift package resolve'?" || return 0
+            _bootstrap_run swift package resolve
             ;;
         docker)
             log_debug "Docker project — nothing to install locally."
@@ -152,6 +182,7 @@ cmd_bootstrap() {
         log_success "Detected: $fw"
     fi
 
+    _bootstrap_preflight "$fw" || die "Bootstrap stopped: a required tool is missing."
     _bootstrap_env_file
     _bootstrap_install "$fw"
     _bootstrap_migrations "$fw"

@@ -8,14 +8,15 @@
 const fs = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const { logInfo, logSuccess, logError, die } = require('./logger');
-const { prompt, requireCmd } = require('./utils');
+const { prompt } = require('./utils');
+const toolchain = require('./toolchain');
 
 function flutter(args) {
     return spawnSync('flutter', args, { stdio: 'inherit' });
 }
 
 async function cmdHardClean() {
-    requireCmd('flutter', 'Install Flutter: https://docs.flutter.dev/get-started/install/windows');
+    if (!(await toolchain.ensure('flutter'))) die('Flutter is required for this command.');
     logInfo('Cleaning Flutter project...');
     fs.rmSync('pubspec.lock', { force: true });
     flutter(['clean']);
@@ -26,7 +27,7 @@ async function cmdHardClean() {
 }
 
 async function cmdBuildRunner() {
-    requireCmd('flutter', 'Install Flutter: https://docs.flutter.dev/get-started/install/windows');
+    if (!(await toolchain.ensure('flutter'))) die('Flutter is required for this command.');
     logInfo('Running Flutter Build Runner...');
     const verboseChoice = ((await prompt('Run in verbose mode? (Y/n)')) || 'Y').toLowerCase();
     const args = ['pub', 'run', 'build_runner', 'build', '--delete-conflicting-outputs'];
@@ -43,7 +44,7 @@ function pubspecVersion() {
 }
 
 async function cmdBuild() {
-    requireCmd('flutter', 'Install Flutter: https://docs.flutter.dev/get-started/install/windows');
+    if (!(await toolchain.ensure('flutter'))) die('Flutter is required for this command.');
     console.log('--- Flutter Build Orchestrator (Windows) ---');
 
     let currentName = '';

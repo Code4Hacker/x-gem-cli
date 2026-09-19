@@ -28,6 +28,10 @@ Make sure you're on a recent xgem version — earlier ones didn't have a Windows
 
 `bin/xgem`'s own internal version banner (`lib/version.sh`'s `XGEM_VERSION`) is a separate constant from `package.json`'s version — they're kept in sync manually on each release. If they're out of sync, that's a release-process slip, not a sign the install didn't take — check `npm view xgem-cli version` against what's actually installed (`npm list -g xgem-cli`) to confirm the real package version.
 
+## `xgem doctor` says a tool isn't installed, but it works in my terminal
+
+Usually the tool lives behind a version manager. `flutter` defined as `alias flutter='fvm flutter'`, or Node loaded by nvm, exists only inside your interactive shell; scripts can't see aliases or shell functions. As of `2.0.0-alpha.16` xgem looks in FVM's, nvm's, rustup's, pyenv's, asdf's, Volta's and Homebrew's real locations and reports where it found the tool and through what. If `doctor` still says "not found", the tool really isn't in any of those places; it prints the download link and install command. If it's installed somewhere unusual, put its `bin` directory on `PATH`. Full detail: [Toolchains](toolchains.md).
+
 ## Still stuck
 
 Run `xgem doctor` (or `xgem doctor ios` for Flutter iOS issues) and include its output when reporting a problem — most reports turn out to be a missing tool on PATH or a version mismatch, and that output makes the diagnosis immediate instead of a multi-round guessing game.

@@ -21,6 +21,10 @@ export XGEM_HOME
 source "$XGEM_HOME/lib/logger.sh"
 # shellcheck source=lib/utils.sh
 source "$XGEM_HOME/lib/utils.sh"
+# shellcheck source=lib/toolchain.sh
+source "$XGEM_HOME/lib/toolchain.sh"
+# shellcheck source=lib/update.sh
+source "$XGEM_HOME/lib/update.sh"
 # shellcheck source=lib/version.sh
 source "$XGEM_HOME/lib/version.sh"
 # shellcheck source=lib/doctor.sh
@@ -56,6 +60,7 @@ for arg in "$@"; do
         --yes)     XGEM_YES=1 ;;
         --dry-run) XGEM_DRY_RUN=1 ;;
         --verbose) XGEM_VERBOSE=1 ;;
+        --no-network) XGEM_NO_NETWORK=1 ;;
         *) ARGS+=("$arg") ;;
     esac
 done
@@ -79,7 +84,8 @@ print_usage() {
     echo "  xgem run <framework> <script> - Run a workspace automation command script"
     echo "  xgem terminate                - Purge all generated automated layouts completely"
     echo "  xgem <framework> [help]       - View tailored instructions for a specific script layout"
-    echo "  xgem doctor [ios]             - Report on your environment / iOS SwiftPM build readiness"
+    echo "  xgem doctor [ios]             - Toolchain report (finds fvm/nvm installs, links, update checks) / iOS build readiness"
+    echo "  xgem update [tool]            - Update installed toolchains (flutter, node, rust, ...) after confirmation"
     echo "  xgem git cmt \"message\"        - Auto-stage, commit, rebase-pull, and push"
     echo "  xgem git init                 - Setup local repo, attach remote tracker shortcuts"
     echo "  xgem git branch               - Pick, create, or switch branches; remembers your choice"
@@ -95,7 +101,7 @@ print_usage() {
     echo "  xgem ci                       - Run lint/test/build for every configured framework, summarized"
     echo "  xgem --version                - Print xgem's version"
     echo ""
-    echo "Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose"
+    echo "Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose, --no-network (skip update lookups)"
 }
 
 case "${1:-}" in
@@ -215,6 +221,11 @@ case "${1:-}" in
 
     doctor)
         cmd_doctor "${2:-}" "${3:-.}"
+        exit 0
+        ;;
+
+    update)
+        cmd_update "${2:-}"
         exit 0
         ;;
 

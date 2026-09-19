@@ -49,9 +49,13 @@ Deletes `.xgem-automate/` entirely and cleans up the `.gitignore` entry. Asks fo
 
 ## `xgem doctor [ios]`
 
-`xgem doctor` — reports OS, architecture, and whether it can find git/flutter/dart/node/python3/go/cargo/docker (and, on macOS, Xcode/CocoaPods). Never fails on a missing tool, just reports it — this is meant to be the first thing you run when something else isn't working.
+`xgem doctor` — a toolchain report for git, Flutter, Dart, Node, Python, Go, Rust, Docker, GitHub CLI, FVM (and Swift on macOS). For each tool it shows the version, **where it was found and through what** (PATH, FVM, nvm, Homebrew, rustup, ...), whether a newer version exists, and, for anything missing, the official download link plus the install command xgem would use. It finds tools that version managers keep off `PATH` (an `alias flutter='fvm flutter'` is invisible to scripts, but the FVM SDK behind it isn't), warns when your project's pinned version (`.fvmrc`, `.nvmrc`, `.tool-versions`) differs from the active one, and lists which version managers it detected. Add `--no-network` to skip update lookups (cached results are still shown). Never fails on a missing tool. See [Toolchains](toolchains.md).
 
 `xgem doctor ios [path]` — standalone iOS build-readiness report: CocoaPods vs SwiftPM, the actual deployment target per build configuration (read via `xcodebuild`, not guessed), what your resolved SwiftPM plugins actually require, and what `FlutterGeneratedPluginSwiftPackage` currently declares — the exact pieces of information the deployment-target reconciliation engine uses, so you can see the diagnosis without triggering a build.
+
+## `xgem update [tool]`
+
+Shows which installed toolchains have a newer version and, after confirmation for each, updates them: Flutter through FVM (`fvm install <latest>`, then optionally `fvm global`/`fvm use`), Node through nvm, Rust through rustup, and Homebrew-managed tools through `brew upgrade`. `xgem update flutter` (or any single tool) checks just that one, and offers to install it if it isn't there. Details and the exact commands: [Toolchains](toolchains.md).
 
 ## `xgem git`
 
@@ -112,11 +116,11 @@ Clone-to-running in one command, for a project you just checked out — not a "c
 5. **Offers to scaffold `.xgem-automate`** if this project hasn't been xgem-tracked before, so `xgem run`/`xgem status`/`xgem ci` work here too.
 6. **Offers to launch the dev server** for node-family projects (`node`→`start`, `react`/`vue`/`angular`/`next`→`dev`) once step 5 has scaffolded that script.
 
-Any tool that isn't installed is skipped with a warning rather than failing the whole run.
+Before doing anything, it checks that the tools this framework needs exist (finding FVM/nvm installs too). If one is missing it names it, gives the download link, and offers to install it — then continues. `--dry-run` shows the `.env` copy and each install/migration command without running them.
 
 ## `xgem ci`
 
-Runs `lint` → `test` → `build` (in that order) for every framework already configured under `.xgem-automate/`, skipping any script that isn't scaffolded for a given framework. Unlike a pre-commit hook, it doesn't stop at the first failure — it runs everything and prints a pass/fail summary at the end, exiting non-zero if anything failed, so you see everything that's broken in one pass instead of a slow fix-one-rerun loop. Requires `.xgem-automate` to already exist (`xgem init`/`xgem add`/`xgem bootstrap` first).
+Runs the checks for every framework already configured under `.xgem-automate/`. For node-family, Go, Rust and the rest that's `lint` → `test` → `build`, skipping any script that isn't scaffolded. **Flutter is the exception:** it runs `flutter analyze` and `flutter test` (skipped if there's no `test/` directory) instead of the scaffolded `build` script, which is an interactive release-build orchestrator, not a CI check — run that yourself with `xgem run flutter build`. Every step runs with `CI=true` and no stdin, so test runners (Vitest, Jest, Angular) run once and exit instead of sitting in watch mode. Unlike a pre-commit hook, it doesn't stop at the first failure — it runs everything and prints a pass/fail summary at the end, exiting non-zero if anything failed, so you see everything that's broken in one pass instead of a slow fix-one-rerun loop. Requires `.xgem-automate` to already exist (`xgem init`/`xgem add`/`xgem bootstrap` first). If a framework's tool (Flutter, Node, ...) isn't installed, it offers to install it before running that framework's checks.
 
 ## `xgem <framework>`
 

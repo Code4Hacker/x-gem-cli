@@ -12,13 +12,21 @@ function detectArch() {
 // works regardless of whether the tool itself supports --version.
 function hasCmd(name) {
     const result = spawnSync('where', [name], { stdio: 'ignore', shell: false });
-    return result.status === 0;
+    if (result.status === 0) return true;
+    const toolchain = require('./toolchain');
+    if (!toolchain.isKnown(name)) return false;
+    const found = toolchain.resolve(name);
+    if (!found) return false;
+    toolchain.activate(found);
+    return true;
 }
 
 function requireCmd(name, hint) {
     if (!hasCmd(name)) {
         const { die } = require('./logger');
-        die(hint ? `'${name}' is required but not found. ${hint}` : `'${name}' is required but not found in PATH.`);
+        const toolchain = require('./toolchain');
+        const link = toolchain.isKnown(name) ? ` Download: ${toolchain.url(toolchain.canon(name))}` : '';
+        die(hint ? `'${name}' is required but not found. ${hint}` : `'${name}' is required but not found in PATH.${link}`);
     }
 }
 

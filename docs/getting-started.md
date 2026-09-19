@@ -22,7 +22,7 @@ xgem --version
 xgem doctor
 ```
 
-`xgem doctor` reports your OS, architecture, and whether it can find git/flutter/node/python/go/cargo/docker (and, on macOS, Xcode/CocoaPods) — it doesn't fail if something's missing, it just tells you what it found. Run this first whenever something isn't working; most "xgem is broken" reports turn out to be "a required tool isn't on PATH", and this shows you that immediately.
+`xgem doctor` reports your OS, architecture, and every toolchain it can find (git, Flutter, Node, Python, Go, Rust, Docker, ...) — including ones managed by FVM or nvm — with versions, where each lives, and whether an update is available. For anything missing it gives the download link and install command. Use `xgem update` to apply updates. Run this first whenever something isn't working; most "xgem is broken" reports turn out to be "a required tool isn't on PATH", and this shows you that immediately.
 
 ## Two things xgem does
 
