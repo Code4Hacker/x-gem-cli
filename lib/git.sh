@@ -33,6 +33,35 @@ _git_base_branch() {
     return 1
 }
 
+_git_resolve_conflicts_help() {
+    local files
+    files=$(git diff --name-only --diff-filter=U 2>/dev/null)
+    if [ -n "$files" ]; then
+        log_warn "Files with conflicts:"
+        echo "$files" | sed 's/^/  - /'
+    fi
+    log_warn "Resolve them, then run: git add <files> && git rebase --continue   (or give up with: git rebase --abort)"
+
+    local open_editor
+    read -r -p "Do you want to open VS Code to resolve this now? (y/n): " open_editor
+    [[ "$open_editor" == "y" || "$open_editor" == "Y" ]] || return 0
+
+    if has_cmd code; then
+        code .
+        return 0
+    fi
+    if [ "$(detect_os)" = "darwin" ]; then
+        local app
+        for app in "Visual Studio Code" "Visual Studio Code - Insiders"; do
+            if [ -d "/Applications/$app.app" ]; then
+                open -a "$app" .
+                return 0
+            fi
+        done
+    fi
+    log_warn "VS Code's 'code' command isn't on your PATH (a shell alias doesn't count — scripts can't see it). In VS Code run Cmd+Shift+P -> 'Shell Command: Install code command in PATH', or open the files above manually."
+}
+
 cmd_git_cmt() {
     local commit_msg=$1
     [ -n "$commit_msg" ] || die "Missing commit message!"
@@ -115,9 +144,7 @@ cmd_git_cmt() {
             log_warn "Your commit is safe locally. Re-run 'xgem git cmt' once connectivity is restored, or push manually: git push $remote_name $current_branch"
             exit 1
         fi
-        local open_editor
-        read -r -p "Do you want to open VS Code to resolve this now? (y/n): " open_editor
-        [[ "$open_editor" == "y" || "$open_editor" == "Y" ]] && code .
+        _git_resolve_conflicts_help
         exit 1
     fi
 
@@ -386,10 +413,7 @@ cmd_git_sync() {
     git_dir=$(git rev-parse --git-dir 2>/dev/null)
     if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ]; then
         log_error "MERGE CONFLICT DETECTED!"
-        log_warn "Execution paused. Resolve conflicts, then 'git rebase --continue'."
-        local open_editor
-        read -r -p "Do you want to open VS Code to resolve this now? (y/n): " open_editor
-        [[ "$open_editor" == "y" || "$open_editor" == "Y" ]] && code .
+        _git_resolve_conflicts_help
     else
         log_error "Rebase failed — this looks like a connection problem, not a merge conflict (see the git error above)."
     fi

@@ -57,6 +57,24 @@ function baseBranch(remote) {
     return '';
 }
 
+async function resolveConflictsHelp() {
+    const files = gitCapture(['diff', '--name-only', '--diff-filter=U']).split(/\r?\n/).filter(Boolean);
+    if (files.length) {
+        logWarn('Files with conflicts:');
+        files.forEach((f) => console.log(`  - ${f}`));
+    }
+    logWarn('Resolve them, then run: git add <files> && git rebase --continue   (or give up with: git rebase --abort)');
+
+    const openEditor = (await prompt('Do you want to open VS Code to resolve this now? (y/n)')).toLowerCase();
+    if (openEditor !== 'y') return;
+
+    if (hasCmd('code')) {
+        spawnSync('code', ['.'], { stdio: 'inherit', shell: true });
+    } else {
+        logWarn("VS Code's 'code' command isn't on your PATH. Reinstall VS Code with 'Add to PATH' enabled, or open the files above manually.");
+    }
+}
+
 async function cmdCmt(commitMsg) {
     if (!commitMsg) die('Missing commit message!');
 
@@ -131,7 +149,7 @@ async function cmdCmt(commitMsg) {
         const inConflict = fs.existsSync(path.join(gitDir, 'rebase-merge')) || fs.existsSync(path.join(gitDir, 'rebase-apply'));
         if (inConflict) {
             logError('MERGE CONFLICT DETECTED!');
-            logWarn('Execution paused. Resolve conflicts to proceed.');
+            await resolveConflictsHelp();
         } else {
             logError(`Could not sync with '${remoteName}' — this looks like a connection problem, not a merge conflict (see the git error above).`);
             logWarn(`Your commit is safe locally. Re-run 'xgem git cmt' once connectivity is restored, or push manually: git push ${remoteName} ${currentBranch}`);
@@ -369,9 +387,7 @@ async function cmdSync() {
     const inConflict = fs.existsSync(path.join(gitDir, 'rebase-merge')) || fs.existsSync(path.join(gitDir, 'rebase-apply'));
     if (inConflict) {
         logError('MERGE CONFLICT DETECTED!');
-        logWarn("Execution paused. Resolve conflicts, then 'git rebase --continue'.");
-        const openEditor = (await prompt('Do you want to open VS Code to resolve this now? (y/n)')).toLowerCase();
-        if (openEditor === 'y') spawnSync('code', ['.'], { stdio: 'inherit' });
+        await resolveConflictsHelp();
     } else {
         logError('Rebase failed — this looks like a connection problem, not a merge conflict (see the git error above).');
     }
