@@ -62,7 +62,7 @@ function printUsage() {
     console.log('  xgem release [major|minor|patch] - Bump version, update CHANGELOG.md, tag, push');
     console.log('  xgem status                   - Dashboard across every xgem-tracked project');
     console.log('  xgem bootstrap                - Clone-to-running: detect framework, install, .env, migrate, launch');
-    console.log('  xgem ci                       - Run lint/test/build for every configured framework, summarized');
+    console.log('  xgem ci [--fix]               - Run lint/test/build for every framework; explains failures and can apply safe auto-fixes');
     console.log('  xgem --version                - Print xgem\'s version');
     console.log('');
     console.log('Flags (any command): --yes (skip confirmations), --dry-run (show, don\'t apply), --verbose, --no-network (skip update lookups)');
@@ -196,7 +196,7 @@ async function main() {
         case 'release': return cmdRelease(a2);
         case 'status': return cmdStatus(CONFIG_DIR);
         case 'bootstrap': return cmdBootstrap(CONFIG_DIR);
-        case 'ci': return cmdCi(CONFIG_DIR);
+        case 'ci': return cmdCi(CONFIG_DIR, args.slice(1));
         case '--version':
         case '-V':
         case 'version': {

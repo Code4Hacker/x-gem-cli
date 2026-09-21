@@ -1,0 +1,9 @@
+
+/proj/src/util.js
+  1:8   error  'fs' is defined but never used                  no-unused-vars
+  2:7   error  'unusedVar' is assigned a value but never used  no-unused-vars
+  5:10  error  'undefinedThing' is not defined                 no-undef
+  7:5   error  'a' is not defined                              no-undef
+
+✖ 4 problems (4 errors, 0 warnings)
+

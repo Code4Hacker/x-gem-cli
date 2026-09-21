@@ -1,0 +1,13 @@
+Analyzing fl...                                                 
+
+   info • The imported package 'missing_pkg' isn't a dependency of the importing package. Try adding a dependency for 'missing_pkg' in the 'pubspec.yaml' file • lib/helper.dart:2:8 • depend_on_referenced_packages
+  error • Target of URI doesn't exist: 'package:missing_pkg/missing.dart'. Try creating the file referenced by the URI, or try using a URI for a file that does exist • lib/helper.dart:2:8 • uri_does_not_exist
+warning • The value of the local variable 'unusedLocal' isn't used. Try removing the variable or using it • lib/helper.dart:6:7 • unused_local_variable
+warning • The value of the local variable 'n' isn't used. Try removing the variable or using it • lib/helper.dart:7:7 • unused_local_variable
+  error • A value of type 'String' can't be assigned to a variable of type 'int'. Try changing the type of the variable, or casting the right-hand type to 'int' • lib/helper.dart:7:11 • invalid_assignment
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/helper.dart:8:3 • avoid_print
+  error • Undefined name 'undefinedName'. Try correcting the name to one that is defined, or defining the name • lib/helper.dart:8:9 • undefined_identifier
+   info • Constructors in '@immutable' classes should be declared as 'const'. Try adding 'const' to the constructor declaration • lib/helper.dart:13:3 • prefer_const_constructors_in_immutables
+   info • Parameter 'key' could be a super parameter. Trying converting 'key' to a super parameter • lib/helper.dart:13:3 • use_super_parameters
+
+9 issues found. (ran in 3.0s)

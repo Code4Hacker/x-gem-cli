@@ -1,0 +1,29 @@
+00:00 +0: loading /proj/test/widget_test.dart
+00:00 +0: adds
+00:00 +0 -1: adds [E]
+  Expected: <3>
+    Actual: <2>
+  
+  package:matcher                                     expect
+  package:flutter_test/src/widget_tester.dart 473:18  expect
+  test/widget_test.dart 3:21                          main.<fn>
+  
+00:00 +0 -1: strings
+00:00 +0 -2: strings [E]
+  Expected: 'abd'
+    Actual: 'ABC'
+     Which: is different.
+            Expected: abd
+              Actual: ABC
+                      ^
+             Differ at offset 0
+  
+  package:matcher                                     expect
+  package:flutter_test/src/widget_tester.dart 473:18  expect
+  test/widget_test.dart 4:24                          main.<fn>
+  
+00:00 +0 -2: Some tests failed.
+
+Failing tests:
+  /proj/test/widget_test.dart: adds
+  /proj/test/widget_test.dart: strings

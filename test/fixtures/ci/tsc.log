@@ -1,0 +1,6 @@
+src/app.ts(1,24): error TS2307: Cannot find module './missing-module' or its corresponding type declarations.
+src/app.ts(3,3): error TS2322: Type 'string' is not assignable to type 'number'.
+src/app.ts(5,7): error TS2322: Type 'string' is not assignable to type 'number'.
+src/app.ts(6,15): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/app.ts(8,13): error TS18048: 'maybe' is possibly 'undefined'.
+src/app.ts(8,27): error TS2552: Cannot find name 'notDefined'. Did you mean 'undefined'?

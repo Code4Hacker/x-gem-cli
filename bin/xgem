@@ -47,6 +47,8 @@ source "$XGEM_HOME/lib/registry.sh"
 source "$XGEM_HOME/lib/status.sh"
 # shellcheck source=lib/bootstrap.sh
 source "$XGEM_HOME/lib/bootstrap.sh"
+# shellcheck source=lib/ci-diagnose.sh
+source "$XGEM_HOME/lib/ci-diagnose.sh"
 # shellcheck source=lib/ci.sh
 source "$XGEM_HOME/lib/ci.sh"
 
@@ -98,7 +100,7 @@ print_usage() {
     echo "  xgem release [major|minor|patch] - Bump version, update CHANGELOG.md, tag, push"
     echo "  xgem status                   - Dashboard across every xgem-tracked project"
     echo "  xgem bootstrap                - Clone-to-running: detect framework, install, .env, migrate, launch"
-    echo "  xgem ci                       - Run lint/test/build for every configured framework, summarized"
+    echo "  xgem ci [--fix]               - Run lint/test/build for every framework; explains failures and can apply safe auto-fixes"
     echo "  xgem --version                - Print xgem's version"
     echo ""
     echo "Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose, --no-network (skip update lookups)"
@@ -245,7 +247,7 @@ case "${1:-}" in
         ;;
 
     ci)
-        cmd_ci
+        cmd_ci "${@:2}"
         exit $?
         ;;
 

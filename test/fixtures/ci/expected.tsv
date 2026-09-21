@@ -1,0 +1,28 @@
+# fixture<TAB>cluster key<TAB>count<TAB>files<TAB>knowledge-base id
+cargo-build	E0308	1	1	E0308
+cargo-build	E0425	1	1	E0425
+cargo-build	rust:unused_variables	1	1	unused_variables
+eslint	no-undef	2	1	no-undef
+eslint	no-unused-vars	2	1	no-unused-vars
+flutter-analyze	invalid_assignment	1	1	invalid_assignment
+flutter-analyze	undefined_identifier	1	1	undefined_identifier
+flutter-analyze	uri_does_not_exist	1	1	uri_does_not_exist
+flutter-analyze	unused_local_variable	2	1	unused_local_variable
+flutter-analyze	avoid_print	1	1	avoid_print
+flutter-analyze	depend_on_referenced_packages	1	1	depend_on_referenced_packages
+flutter-analyze	prefer_const_constructors_in_immutables	1	1	prefer_const_constructors_in_immutables
+flutter-analyze	use_super_parameters	1	1	use_super_parameters
+flutter-test	assertion_mismatch	2	1	assertion_mismatch
+jest	Cannot find module 'nonexistent-pkg'	1	1	module_not_found
+jest	assertion_mismatch	1	1	assertion_mismatch
+jest	undefined_property	1	1	undefined_property
+tsc	TS2322	2	1	TS2322
+tsc	TS18048	1	1	TS18048
+tsc	TS2307	1	1	TS2307
+tsc	TS2552	1	1	TS2552
+tsc	TS7006	1	1	TS7006
+vitest-assert	assertion_mismatch	2	1	assertion_mismatch
+vitest-assert	test_timeout	1	1	test_timeout
+vitest-flood	No provider for HttpClient	12	3	angular_no_provider
+vitest-flood	ReferenceError: a is not defined	1	1	reference_not_defined
+vitest-startup	Cannot find package 'vite'	1	0	module_not_found

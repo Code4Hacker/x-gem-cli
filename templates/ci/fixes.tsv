@@ -1,0 +1,72 @@
+# id	kind	pattern	why	fix	autofix	docs	group
+unused_import	code	unused_import	The import is never used in this file.	Delete the import line.	dart fix --apply	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+unused_local_variable	code	unused_local_variable	A local variable is assigned but never read.	Remove the variable, or use it. If it must stay, rename it with a leading underscore.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+unused_element	code	unused_element	A private member is declared but never used.	Remove it, or use it.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+unused_field	code	unused_field	A private field is declared but never read.	Remove it, or use it.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+dead_code	code	dead_code	This code can never run (it follows a return/throw, or a condition is always false).	Delete the unreachable code, or fix the logic that makes it unreachable.	dart fix --apply	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+uri_does_not_exist	code	uri_does_not_exist	An import points at a file or package that isn't available.	If it's a package, add it (flutter pub add <package>) and run flutter pub get. If it's a file, fix the path or create the file.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+invalid_assignment	code	invalid_assignment	A value of one type is being assigned to a variable of another type.	Change the variable's type, convert the value (for example int.parse(...)), or cast it if you are certain.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+undefined_identifier	code	undefined_identifier	The name isn't declared in this scope, or the import that provides it is missing.	Check the spelling, declare it, or add the import that provides it.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+undefined_class	code	undefined_class	The class isn't declared or its import is missing.	Import the file that defines it, or fix the class name.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+undefined_method	code	undefined_method	That method doesn't exist on this type.	Check for a typo, that the value has the type you expect, or that the extension/mixin providing it is imported.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+undefined_getter	code	undefined_getter	That property doesn't exist on this type.	Check for a typo, that the value has the type you expect, or add the property.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+argument_type_not_assignable	code	argument_type_not_assignable	An argument's type doesn't match the parameter's type.	Pass a value of the expected type, or convert it first.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+missing_required_argument	code	missing_required_argument	A required named parameter wasn't passed.	Pass the missing argument.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+deprecated_member_use	code	deprecated_member_use	This API is marked deprecated and will be removed.	Switch to the replacement named in the message.	-	https://dart.dev/tools/diagnostic-messages#@CODE@	id
+avoid_print	code	avoid_print	print() is flagged in production code because it isn't controllable or filterable.	Use debugPrint, or a logger such as package:logging.	-	https://dart.dev/tools/linter-rules/@CODE@	id
+depend_on_referenced_packages	code	depend_on_referenced_packages	The code imports a package that pubspec.yaml doesn't declare.	Add it: flutter pub add <package>.	-	https://dart.dev/tools/linter-rules/@CODE@	id
+prefer_const_constructors	code	prefer_const_constructors	This constructor call can be const, which lets Flutter reuse the object.	Add const.	dart fix --apply	https://dart.dev/tools/linter-rules/@CODE@	id
+prefer_const_constructors_in_immutables	code	prefer_const_constructors_in_immutables	The constructor of an immutable class can be const.	Add const to the constructor.	dart fix --apply	https://dart.dev/tools/linter-rules/@CODE@	id
+prefer_const_declarations	code	prefer_const_declarations	This final variable's value is a compile-time constant.	Change final to const.	dart fix --apply	https://dart.dev/tools/linter-rules/@CODE@	id
+use_super_parameters	code	use_super_parameters	A parameter is only forwarded to super and can use the shorter super-parameter syntax.	Convert it to a super parameter (Foo({super.key})).	dart fix --apply	https://dart.dev/tools/linter-rules/@CODE@	id
+prefer_final_fields	code	prefer_final_fields	A private field is never reassigned.	Make it final.	dart fix --apply	https://dart.dev/tools/linter-rules/@CODE@	id
+unnecessary_this	code	unnecessary_this	'this.' isn't needed here.	Remove 'this.'.	dart fix --apply	https://dart.dev/tools/linter-rules/@CODE@	id
+unnecessary_new	code	unnecessary_new	'new' is optional in Dart.	Remove 'new'.	dart fix --apply	https://dart.dev/tools/linter-rules/@CODE@	id
+annotate_overrides	code	annotate_overrides	An overriding member is missing @override.	Add @override.	dart fix --apply	https://dart.dev/tools/linter-rules/@CODE@	id
+TS2307	code	TS2307	The import path doesn't resolve to a file or an installed package (or its type declarations).	Fix the path or extension. For a package, install it (npm i <package>), plus @types/<package> if it has no types. Check tsconfig 'paths' and 'moduleResolution' if the path is an alias.	-	-	id
+TS2304	code	TS2304	The name isn't declared or imported in this file.	Import it, declare it, or fix the spelling.	-	-	id
+TS2552	code	TS2552	The name isn't declared or imported (TypeScript suggests the closest match).	Use the suggested name, or import/declare the one you meant.	-	-	id
+TS2322	code	TS2322	A value's type doesn't match the type it's assigned to.	Make the value match the declared type, or change the declared type if the value is the one that's right.	-	-	id
+TS2345	code	TS2345	An argument's type doesn't match the parameter's type.	Pass a value of the parameter's type, or convert it first.	-	-	id
+TS2339	code	TS2339	The property doesn't exist on that type.	Check for a typo, narrow the type first, or add the property to the type or interface.	-	-	id
+TS2554	code	TS2554	The call passes a different number of arguments than the function accepts.	Pass the right number of arguments, or update the function's signature.	-	-	id
+TS7006	code	TS7006	A parameter has no type, so it implicitly has type any (strict mode forbids that).	Add a type annotation to the parameter.	-	-	id
+TS18048	code	TS18048	The value might be undefined at this point.	Guard it (if (x) ...), use optional chaining (x?.y) or a default (x ?? fallback). Avoid the ! operator unless you are certain.	-	-	id
+TS2532	code	TS2532	The object might be undefined at this point.	Guard it (if (x) ...), use optional chaining (x?.y) or a default (x ?? fallback).	-	-	id
+TS2531	code	TS2531	The object might be null at this point.	Guard it (if (x) ...), use optional chaining (x?.y) or a default (x ?? fallback).	-	-	id
+TS6133	code	TS6133	A variable, parameter or import is declared but never used.	Remove it (or prefix a parameter with an underscore).	-	-	id
+no-undef	code	no-undef	The identifier isn't defined in this environment.	Import or declare it. If it's a real global (browser or Node), add it to languageOptions.globals (or env in older configs).	-	https://eslint.org/docs/latest/rules/@CODE@	id
+no-unused-vars	code	no-unused-vars	A variable or import is declared but never used.	Remove it, or use it. Prefix with an underscore only if your config allows that for intentional cases.	-	https://eslint.org/docs/latest/rules/@CODE@	id
+@typescript-eslint/no-unused-vars	code	@typescript-eslint/no-unused-vars	A variable or import is declared but never used.	Remove it, or use it.	-	-	id
+@typescript-eslint/no-explicit-any	code	@typescript-eslint/no-explicit-any	An explicit 'any' switches off type checking for that value.	Use a specific type, or unknown and narrow it.	-	-	id
+prefer-const	code	prefer-const	A variable is never reassigned.	Use const instead of let.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+semi	code	semi	A semicolon is missing or extra, per your style rules.	Fix the semicolon.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+quotes	code	quotes	The quote style doesn't match your style rules.	Use the configured quote style.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+indent	code	indent	The indentation doesn't match your style rules.	Re-indent.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+no-extra-semi	code	no-extra-semi	There's an unnecessary semicolon.	Remove it.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+comma-dangle	code	comma-dangle	A trailing comma is missing or extra, per your style rules.	Fix the trailing comma.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+no-trailing-spaces	code	no-trailing-spaces	A line has trailing whitespace.	Remove it.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+eol-last	code	eol-last	The file doesn't end with a newline.	Add a final newline.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+no-multiple-empty-lines	code	no-multiple-empty-lines	There are too many consecutive blank lines.	Remove the extra blank lines.	@LINT_FIX@	https://eslint.org/docs/latest/rules/@CODE@	id
+no-console	code	no-console	console.* calls are flagged in this project.	Remove it, or use the project's logger.	-	https://eslint.org/docs/latest/rules/@CODE@	id
+E0308	code	E0308	A value's type doesn't match the type the code expects.	Make the value match the expected type, or convert it (.into(), as, .parse()).	-	https://doc.rust-lang.org/error_codes/@CODE@.html	id
+E0425	code	E0425	The name (value or function) isn't in scope.	Declare it, fix the spelling, or bring it into scope with `use`.	-	https://doc.rust-lang.org/error_codes/@CODE@.html	id
+E0433	code	E0433	A path uses a type, module or crate that isn't in scope or isn't a dependency.	Add the `use` line, or add the crate to Cargo.toml (cargo add <crate>).	-	https://doc.rust-lang.org/error_codes/@CODE@.html	id
+E0432	code	E0432	A `use` path doesn't exist.	Check the path and spelling, and that the crate is in Cargo.toml.	-	https://doc.rust-lang.org/error_codes/@CODE@.html	id
+E0382	code	E0382	The value was moved earlier and can't be used again.	Borrow it (&x), clone it (x.clone()), or restructure who owns the value.	-	https://doc.rust-lang.org/error_codes/@CODE@.html	id
+E0599	code	E0599	That method doesn't exist for this type.	Check for a typo, that the right trait is imported (use Trait), or that the type is what you expect.	-	https://doc.rust-lang.org/error_codes/@CODE@.html	id
+unused_variables	code	rust:unused_variables	A variable is declared but never used.	Use it, or prefix the name with an underscore.	cargo fix --allow-dirty --allow-staged	-	id
+unused_imports	code	rust:unused_imports	A `use` line isn't needed.	Remove it.	cargo fix --allow-dirty --allow-staged	-	id
+dead_code_rust	code	rust:dead_code	A function or item is never used.	Remove it, use it, or mark it with #[allow(dead_code)] if intentional.	-	-	id
+go_unused_var	regex	declared (and|but) not used	A variable is declared but never used (Go treats that as an error).	Remove it, use it, or assign it to _ if that's intentional.	-	-	id
+go_unused_import	regex	imported (and|but) not used	An import isn't used (Go treats that as an error).	Remove the import line (goimports -w . does this).	-	-	id
+go_undefined	regex	^undefined: 	The name isn't declared or imported.	Declare it, fix the spelling, or import the package that provides it.	-	-	id
+angular_no_provider	regex	No provider for [A-Za-z0-9_$]+	Angular can't create something because a service it needs isn't provided here (in this test's TestBed, or in the app config).	Provide it. In a test: TestBed.configureTestingModule({ providers: [TheService] }). For HttpClient use provideHttpClient() and provideHttpClientTesting() (HttpClientTestingModule on older Angular); for Router use provideRouter([]).	-	-	match
+angular_unknown_element	regex	is not a known element|since it isn't a known property	A template uses a component, directive or property that Angular doesn't know in this context.	Add the component/directive/module to the imports of the component (standalone) or of TestBed.configureTestingModule, and check the selector spelling.	-	-	id
+module_not_found	regex	Cannot find (module|package) '[^']+'	A dependency isn't installed, or an import path is wrong.	Run your package manager's install. If it names a package, add it (npm i <name>; for a tool's missing peer dependency, add that as a devDependency). If it's a relative path, fix it.	-	-	match
+test_timeout	regex	timed out in [0-9]+ ?ms|Exceeded timeout of|Timeout - Async callback	The test didn't finish within its time limit, usually an unresolved promise or observable, or a missing await.	Make sure the test awaits or returns its async work, or completes the observable. Raise the timeout only if the work is legitimately slow.	-	-	id
+reference_not_defined	regex	ReferenceError: [A-Za-z0-9_$]+ is not defined	Code uses a name that doesn't exist at runtime (typo, missing import, or a browser global such as window/document in a Node test).	Import or declare it. For window/document, run the test in a browser-like environment (jsdom or happy-dom).	-	-	match
+undefined_property	regex	Cannot read propert(y|ies) of (undefined|null)	Code read a property of something that is undefined or null. Usually a value wasn't set up, or a call returned nothing.	Look at the failing line: initialize the value in the test setup, or guard it (x?.y).	-	-	id
+not_a_function	regex	is not a function	Something that isn't a function was called (wrong import, missing mock, or undefined).	Check what the name really holds at that point: the import, the mock, or a typo.	-	-	id
+snapshot_mismatch	regex	[Ss]napshot .*(mismatch|did not match|obsolete)|toMatchSnapshot|toMatchInlineSnapshot	The output no longer matches the stored snapshot.	If the change is intended, update the snapshots (your test runner's -u flag). Otherwise fix the code that changed the output.	-	-	id
+assertion_mismatch	regex	(Expected|expected).*(Actual|Received|to be|to equal|to deeply equal|to have|to contain)|Which: is different	The code under test produced something different from what the test expects.	Compare Expected with Actual above. If the code's behavior is wrong, fix the code; if the expectation is outdated, update the test.	-	-	id

@@ -70,7 +70,7 @@ xgem git hooks <install|uninstall> Manage a pre-commit lint/test hook
 xgem release [major|minor|patch] Bump version, update CHANGELOG.md, tag, push
 xgem status                   Dashboard across every xgem-tracked project
 xgem bootstrap                Clone-to-running: detect framework, install, .env, migrate, launch
-xgem ci                       Run lint/test/build for every configured framework, summarized
+xgem ci [--fix]               Run lint/test/build; explains each failure (where, why, how to fix) and can auto-fix safely
 xgem --version                Print xgem's version
 
 Flags (any command): --yes (skip confirmations), --dry-run (show, don't apply), --verbose, --no-network (skip update lookups)

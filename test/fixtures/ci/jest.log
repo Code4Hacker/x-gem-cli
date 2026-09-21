@@ -1,0 +1,46 @@
+FAIL src/a.test.js
+  ● adds
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 5
+    Received: 4
+
+    > 1 | test('adds', () => { expect(2 + 2).toBe(5); });
+        |                                    ^
+      2 | test('cannot read', () => { const o = undefined; return o.value; });
+      3 | test('missing dep', () => { require('nonexistent-pkg'); });
+      4 |
+
+      at Object.toBe (src/a.test.js:1:36)
+
+  ● cannot read
+
+    TypeError: Cannot read properties of undefined (reading 'value')
+
+      1 | test('adds', () => { expect(2 + 2).toBe(5); });
+    > 2 | test('cannot read', () => { const o = undefined; return o.value; });
+        |                                                           ^
+      3 | test('missing dep', () => { require('nonexistent-pkg'); });
+      4 |
+
+      at Object.value (src/a.test.js:2:59)
+
+  ● missing dep
+
+    Cannot find module 'nonexistent-pkg' from 'src/a.test.js'
+
+      1 | test('adds', () => { expect(2 + 2).toBe(5); });
+      2 | test('cannot read', () => { const o = undefined; return o.value; });
+    > 3 | test('missing dep', () => { require('nonexistent-pkg'); });
+        |                             ^
+      4 |
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/index.js:1031:11)
+      at Object.require (src/a.test.js:3:29)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 3 total
+Snapshots:   0 total
+Time:        0.21 s
+Ran all test suites.

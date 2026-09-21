@@ -1,0 +1,27 @@
+   Compiling demo v0.1.0 (/proj)
+error[E0308]: mismatched types
+ --> src/main.rs:7:18
+  |
+7 |     let x: i32 = "hello";
+  |            ---   ^^^^^^^ expected `i32`, found `&str`
+  |            |
+  |            expected due to this
+
+error[E0425]: cannot find function `missing_fn` in this scope
+  --> src/main.rs:10:36
+   |
+10 |     println!("{:?} {:?} {}", v, w, missing_fn(x));
+   |                                    ^^^^^^^^^^ not found in this scope
+
+warning: unused variable: `unused`
+ --> src/main.rs:2:9
+  |
+2 |     let unused = 5;
+  |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_unused`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0308, E0425.
+For more information about an error, try `rustc --explain E0308`.
+warning: `demo` (bin "demo") generated 1 warning
+error: could not compile `demo` (bin "demo") due to 2 previous errors; 1 warning emitted
