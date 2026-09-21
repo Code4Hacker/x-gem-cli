@@ -1,6 +1,6 @@
 {
   "name": "xgem-cli",
-  "version": "2.0.0-alpha.16",
+  "version": "2.0.0-alpha.17",
   "description": "Framework-aware automation CLI: scaffolds and runs clean/build/dev scripts per project type, an environment doctor, a SwiftPM-aware iOS build engine, and a git workflow helper. Runs natively on macOS, Linux, and Windows.",
   "bin": {
     "xgem": "bin/xgem.js"
@@ -17,7 +17,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "bash -n bin/xgem && for f in lib/*.sh; do bash -n \"$f\"; done && for f in bin/xgem.js lib-win/*.js; do node --check \"$f\"; done"
+    "test": "bash -n bin/xgem && for f in lib/*.sh; do bash -n \"$f\"; done && for f in bin/xgem.js lib-win/*.js; do node --check \"$f\"; done && bash test/ci-diagnose.sh"
   },
   "keywords": [
     "cli",
